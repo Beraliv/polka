@@ -1,0 +1,25 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    environment:
+      PORT: "3001"
+      HOST: "0.0.0.0"
+      PROGRESS_PATH: "/data/progress"
+    volumes:
+      - progress_data:/data/progress
+    restart: unless-stopped
+
+  client:
+    build:
+      context: .
+      dockerfile: apps/client/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+    restart: unless-stopped
+
+volumes:
+  progress_data:

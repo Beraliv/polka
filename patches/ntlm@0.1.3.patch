@@ -1,0 +1,202 @@
+diff --git a/lib/ntlm.js b/lib/ntlm.js
+index 4d2863b50346dc0e55ffb23d5da2c37ef3e67ddf..25056f7f076a35b12a9d5fa7272288436e30f6a8 100755
+--- a/lib/ntlm.js
++++ b/lib/ntlm.js
+@@ -41,11 +41,10 @@ function encodeType1(hostname, ntdomain) {
+   buf.fill(0x00, pos, pos + 3); // byte zero[3];
+   pos += 3;
+ 
+-  buf.writeUInt16LE(0xb203, pos); // short flags;
+-  pos += 2;
+-
+-  buf.fill(0x00, pos, pos + 2); // byte zero[2];
+-  pos += 2;
++  // 32-bit negotiate flags — include NTLMSSP_NEGOTIATE_TARGET_INFO (0x00800000)
++  // so the server includes TargetInfo in its Type2 challenge (needed for NTLMv2)
++  buf.writeUInt32LE(0x0080B203, pos);
++  pos += 4;
+ 
+   buf.writeUInt16LE(ntdomainlen, pos); // short dom_len;
+   pos += 2;
+@@ -78,7 +77,7 @@ function encodeType1(hostname, ntdomain) {
+ 
+ 
+ /*
+- * 
++ *
+  */
+ function decodeType2(buf)
+ {
+@@ -98,6 +97,34 @@ function decodeType2(buf)
+   return nonce;
+ }
+ 
++/*
++ * Extended Type2 decode that returns both the server challenge and
++ * the TargetInfo blob (required for NTLMv2 response computation).
++ */
++function decodeType2v2(buf) {
++  var proto = buf.toString('ascii', 0, 7);
++  if (buf[7] !== 0x00 || proto !== 'NTLMSSP')
++    throw new Error('magic was not NTLMSSP');
++
++  var type = buf.readUInt8(8);
++  if (type !== 0x02)
++    throw new Error('message was not NTLMSSP type 0x02');
++
++  var nonce = buf.slice(24, 32);
++
++  // TargetInfo fields at offset 40 (Len:2 + MaxLen:2 + Offset:4)
++  var targetInfo = Buffer.alloc(0);
++  if (buf.length > 47) {
++    var tiLen = buf.readUInt16LE(40);
++    var tiOffset = buf.readUInt32LE(44);
++    if (tiLen > 0 && tiOffset > 0 && tiOffset + tiLen <= buf.length) {
++      targetInfo = buf.slice(tiOffset, tiOffset + tiLen);
++    }
++  }
++
++  return { nonce: nonce, targetInfo: targetInfo };
++}
++
+ function encodeType3(username, hostname, ntdomain, nonce, password) {
+   hostname = hostname.toUpperCase();
+   ntdomain = ntdomain.toUpperCase();
+@@ -203,6 +230,127 @@ function encodeType3(username, hostname, ntdomain, nonce, password) {
+   return buf;
+ }
+ 
++/*
++ * NTLMv2 Type3 authenticate message.
++ *
++ * Uses HMAC-MD5 based responses (NTLMv2 hash + blob) instead of DES-ECB
++ * (NTLMv1). Required when the server enforces ntlm auth = ntlmv2-only,
++ * which is the Samba/TrueNAS default since Samba 4.x.
++ */
++function encodeType3v2(username, hostname, ntdomain, serverChallenge, targetInfo, password) {
++  // NT hash: MD4(UTF-16LE(password))
++  var ntHash = nthashbuf(password);
++
++  // NTLMv2 hash: HMAC-MD5(ntHash, UTF-16LE(upper(username) + domain))
++  var identity = Buffer.concat([
++    Buffer.from(username.toUpperCase(), 'ucs2'),
++    Buffer.from(ntdomain, 'ucs2'),
++  ]);
++  var ntlmv2Hash = crypto.createHmac('md5', ntHash).update(identity).digest();
++
++  // Client challenge: 8 random bytes
++  var clientChallenge = crypto.randomBytes(8);
++
++  // Windows FILETIME: 100-nanosecond intervals since 1601-01-01
++  var ts = BigInt(Date.now()) * 10000n + 116444736000000000n;
++  var tsBuf = Buffer.allocUnsafe(8);
++  tsBuf.writeBigUInt64LE(ts);
++
++  // Blob = version(8) + timestamp(8) + clientChallenge(8) + reserved(4) + targetInfo + terminator(4)
++  var blob = Buffer.concat([
++    Buffer.from([0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
++    tsBuf,
++    clientChallenge,
++    Buffer.alloc(4),
++    targetInfo,
++    Buffer.alloc(4),
++  ]);
++
++  // NTProofStr = HMAC-MD5(ntlmv2Hash, serverChallenge + blob)
++  var ntProofStr = crypto.createHmac('md5', ntlmv2Hash)
++    .update(Buffer.concat([serverChallenge, blob]))
++    .digest();
++
++  // NT response = NTProofStr + blob
++  var ntResponse = Buffer.concat([ntProofStr, blob]);
++
++  // LMv2 response = HMAC-MD5(ntlmv2Hash, serverChallenge + clientChallenge) + clientChallenge
++  var lmProof = crypto.createHmac('md5', ntlmv2Hash)
++    .update(Buffer.concat([serverChallenge, clientChallenge]))
++    .digest();
++  var lmResponse = Buffer.concat([lmProof, clientChallenge]);
++
++  // Compute field sizes and offsets
++  hostname = hostname.toUpperCase();
++  var ntRespLen = ntResponse.length;
++  var lmRespLen = lmResponse.length; // 24
++  var domainLen = Buffer.byteLength(ntdomain, 'ucs2');
++  var usernameLen = Buffer.byteLength(username, 'ucs2');
++  var hostnameLen = Buffer.byteLength(hostname, 'ucs2');
++
++  // Fixed header = 64 bytes (Signature + Type + 6 field descriptors + flags)
++  var payloadBase = 64;
++  var lmrOff  = payloadBase;
++  var ntrOff  = lmrOff  + lmRespLen;
++  var domOff  = ntrOff  + ntRespLen;
++  var userOff = domOff  + domainLen;
++  var hostOff = userOff + usernameLen;
++  var msgLen  = hostOff + hostnameLen;
++
++  var buf = Buffer.alloc(msgLen);
++  var pos = 0;
++
++  // Signature
++  buf.write('NTLMSSP', pos, 7, 'ascii');
++  pos += 7;
++  buf.writeUInt8(0, pos++);
++
++  // MessageType = 3
++  buf.writeUInt32LE(0x00000003, pos);
++  pos += 4;
++
++  // LmChallengeResponseFields
++  buf.writeUInt16LE(lmRespLen, pos); pos += 2;
++  buf.writeUInt16LE(lmRespLen, pos); pos += 2;
++  buf.writeUInt32LE(lmrOff, pos);    pos += 4;
++
++  // NtChallengeResponseFields
++  buf.writeUInt16LE(ntRespLen, pos); pos += 2;
++  buf.writeUInt16LE(ntRespLen, pos); pos += 2;
++  buf.writeUInt32LE(ntrOff, pos);    pos += 4;
++
++  // DomainNameFields
++  buf.writeUInt16LE(domainLen, pos); pos += 2;
++  buf.writeUInt16LE(domainLen, pos); pos += 2;
++  buf.writeUInt32LE(domOff, pos);    pos += 4;
++
++  // UserNameFields
++  buf.writeUInt16LE(usernameLen, pos); pos += 2;
++  buf.writeUInt16LE(usernameLen, pos); pos += 2;
++  buf.writeUInt32LE(userOff, pos);     pos += 4;
++
++  // WorkstationFields
++  buf.writeUInt16LE(hostnameLen, pos); pos += 2;
++  buf.writeUInt16LE(hostnameLen, pos); pos += 2;
++  buf.writeUInt32LE(hostOff, pos);     pos += 4;
++
++  // EncryptedRandomSessionKeyFields (empty — no session key)
++  buf.writeUInt32LE(0, pos); pos += 4;
++  buf.writeUInt32LE(0, pos); pos += 4;
++
++  // NegotiateFlags: UNICODE | NTLM | ALWAYS_SIGN | TARGET_INFO | 128 | 56
++  buf.writeUInt32LE(0xA0808205, pos); pos += 4;
++
++  // pos === 64 here; write payload
++  lmResponse.copy(buf, lmrOff);
++  ntResponse.copy(buf, ntrOff);
++  buf.write(ntdomain,  domOff,  domainLen,   'ucs2');
++  buf.write(username,  userOff, usernameLen, 'ucs2');
++  buf.write(hostname,  hostOff, hostnameLen, 'ucs2');
++
++  return buf;
++}
++
+ function makeResponse(hash, nonce)
+ {
+   var out = new Buffer(24);
+@@ -217,7 +365,9 @@ function makeResponse(hash, nonce)
+ 
+ exports.encodeType1 = encodeType1;
+ exports.decodeType2 = decodeType2;
++exports.decodeType2v2 = decodeType2v2;
+ exports.encodeType3 = encodeType3;
++exports.encodeType3v2 = encodeType3v2;
+ 
+ // Convenience methods.
+ 

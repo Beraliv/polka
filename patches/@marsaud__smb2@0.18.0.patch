@@ -1,0 +1,33 @@
+diff --git a/lib/messages/session_setup_step1.js b/lib/messages/session_setup_step1.js
+index 9cfba8fc50b13be35b15f264271ece86cbe49db4..1148d870346410b4963e0c7855edc0f79d2c92f3 100644
+--- a/lib/messages/session_setup_step1.js
++++ b/lib/messages/session_setup_step1.js
+@@ -20,6 +20,9 @@ module.exports = message({
+   onSuccess: function(connection, response) {
+     var h = response.getHeaders();
+     connection.SessionId = h.SessionId;
+-    connection.nonce = ntlm.decodeType2(response.getResponse().Buffer);
++    // Use extended decode to capture TargetInfo for NTLMv2 response
++    var type2 = ntlm.decodeType2v2(response.getResponse().Buffer);
++    connection.nonce = type2.nonce;
++    connection.targetInfo = type2.targetInfo;
+   },
+ });
+diff --git a/lib/messages/session_setup_step2.js b/lib/messages/session_setup_step2.js
+index 04df64950934f6556c8c64f4b528f8eed0443c1d..a9fb173d0553c7bfea36693dfa04de09e8001fff 100644
+--- a/lib/messages/session_setup_step2.js
++++ b/lib/messages/session_setup_step2.js
+@@ -11,11 +11,12 @@ module.exports = message({
+         ProcessId: connection.ProcessId,
+       },
+       request: {
+-        Buffer: ntlm.encodeType3(
++        Buffer: ntlm.encodeType3v2(
+           connection.username,
+           connection.ip,
+           connection.domain,
+           connection.nonce,
++          connection.targetInfo || Buffer.alloc(0),
+           connection.password
+         ),
+       },

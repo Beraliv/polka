@@ -8,6 +8,12 @@ import { progressRoutes } from './routes/progress.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// @marsaud/smb2 uses ntlm which can throw synchronously in callbacks outside
+// the route try/catch. Log and continue rather than crashing the server.
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception (SMB/NTLM):', err.message);
+});
+
 const app = Fastify({ logger: { level: 'info' } });
 
 await app.register(cors, { origin: true });

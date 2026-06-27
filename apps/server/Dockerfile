@@ -18,4 +18,5 @@ ENV PORT=3001
 ENV HOST=0.0.0.0
 EXPOSE 3001
 
+ENV NODE_OPTIONS=--openssl-legacy-provider
 CMD ["node", "--experimental-strip-types", "apps/server/src/index.ts"]

@@ -22,7 +22,7 @@ export async function testConnection(config: SMBConfig): Promise<void> {
   try {
     await smb.readdir('');
   } finally {
-    smb.close();
+    smb.disconnect();
   }
 }
 
@@ -36,7 +36,7 @@ export async function listFiles(config: SMBConfig, path: string): Promise<FileEn
       isDirectory: !name.match(/\.(epub|fb2)$/i),
     }));
   } finally {
-    smb.close();
+    smb.disconnect();
   }
 }
 
@@ -45,6 +45,6 @@ export async function readFile(config: SMBConfig, path: string): Promise<Buffer>
   try {
     return await smb.readFile(path);
   } finally {
-    smb.close();
+    smb.disconnect();
   }
 }

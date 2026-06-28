@@ -1,8 +1,9 @@
-export async function computeBookId(buffer: ArrayBuffer): Promise<string> {
-  const slice = buffer.byteLength > 1024 ? buffer.slice(0, 1024) : buffer;
-  const hashBuffer = await crypto.subtle.digest('SHA-256', slice);
-  const bytes = new Uint8Array(hashBuffer);
-  return Array.from(bytes.slice(0, 4))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+export function computeBookId(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer.byteLength > 1024 ? buffer.slice(0, 1024) : buffer);
+  // FNV-1a 32-bit — no Web Crypto API needed, works over plain HTTP
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < bytes.length; i++) {
+    hash = ((hash ^ bytes[i]) * 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
 }

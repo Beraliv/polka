@@ -29,11 +29,13 @@ export async function testConnection(config: SMBConfig): Promise<void> {
 export async function listFiles(config: SMBConfig, path: string): Promise<FileEntry[]> {
   const smb = createClient(config);
   try {
-    const entries = await smb.readdir(path);
-    return entries.map((name: string) => ({
-      name,
-      path: path ? `${path}\\${name}` : name,
-      isDirectory: !name.match(/\.(epub|fb2)$/i),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const entries = await smb.readdir(path, { stats: true }) as any[];
+    return entries.map((entry) => ({
+      name: entry.name as string,
+      path: path ? `${path}\\${(entry.name as string)}` : (entry.name as string),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      isDirectory: entry.isDirectory() as boolean,
     }));
   } finally {
     smb.disconnect();

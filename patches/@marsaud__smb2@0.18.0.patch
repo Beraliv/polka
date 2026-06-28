@@ -1,3 +1,262 @@
+diff --git a/lib/api/readFile.js b/lib/api/readFile.js
+index d6dcec808bbb399eaa9c4574bd5d26bb130a448c..3e8ab8fb94eab046fb8a4e1a49cca569a1d1164c 100644
+--- a/lib/api/readFile.js
++++ b/lib/api/readFile.js
+@@ -11,7 +11,12 @@ var MAX_READ_LENGTH = require('../structures/constants').MAX_READ_LENGTH;
+  *
+  *  - open the file
+  *
+- *  - read the content
++ *  - get file size: from CREATE EndofFile, or via QUERY_INFO if 0
++ *
++ *  - if size is known: read concurrently with pre-allocated buffer
++ *
++ *  - if size is unknown (server returns 0): read sequentially until
++ *    STATUS_END_OF_FILE, concatenating chunks
+  *
+  *  - close the file
+  *
+@@ -25,72 +30,146 @@ module.exports = function readFile(filename, options, cb) {
+   }
+ 
+   SMB2Request('open', { path: filename }, connection, function(err, file) {
+-    if (err) cb && cb(err);
+-    // SMB2 read file content
+-    else {
+-      var fileLength = 0;
+-      var offset = new BigInt(8);
+-      var stop = false;
+-      var nbRemainingPackets = 0;
+-      // get file length
+-      for (var i = 0; i < file.EndofFile.length; i++) {
+-        fileLength += file.EndofFile[i] * Math.pow(2, i * 8);
+-      }
+-      var result = Buffer.allocUnsafe(fileLength);
+-      // callback manager
+-      var callback = function(offset) {
+-        return function(err, content) {
+-          if (stop) return;
+-          if (err) {
+-            cb && cb(err);
+-            stop = true;
+-          } else {
+-            content.copy(result, offset.toNumber());
+-            nbRemainingPackets--;
+-            checkDone();
++    if (err) return cb && cb(err);
++
++    var rawLength = 0;
++    for (var i = 0; i < file.EndofFile.length; i++) {
++      rawLength += file.EndofFile[i] * Math.pow(2, i * 8);
++    }
++
++    if (rawLength > 0) {
++      doRead(file, rawLength);
++      return;
++    }
++
++    // CREATE returned EndofFile=0 (TrueNAS/Samba behaviour).
++    // Try QUERY_INFO FileStandardInformation for the real size.
++    SMB2Request(
++      'query_info',
++      { FileId: file.FileId },
++      connection,
++      function(qErr, endOfFileBuf) {
++        if (!qErr && endOfFileBuf) {
++          var realLength = 0;
++          for (var j = 0; j < endOfFileBuf.length; j++) {
++            realLength += endOfFileBuf[j] * Math.pow(2, j * 8);
+           }
+-        };
+-      };
+-      // callback manager
+-      var checkDone = function() {
++          if (realLength > 0) {
++            doRead(file, realLength);
++            return;
++          }
++        }
++        // Size still unknown: read chunks until STATUS_END_OF_FILE.
++        readChunks(file);
++      }
++    );
++  });
++
++  // Fast concurrent read when file size is known.
++  function doRead(file, fileLength) {
++    var offset = new BigInt(8);
++    var stop = false;
++    var nbRemainingPackets = 0;
++    var result = Buffer.allocUnsafe(fileLength);
++
++    var callback = function(offset) {
++      return function(err, content) {
+         if (stop) return;
+-        createPackets();
+-        if (nbRemainingPackets === 0 && offset.ge(fileLength)) {
+-          SMB2Request('close', file, connection, function() {
+-            if (options.encoding) {
+-              result = result.toString(options.encoding);
+-            }
+-            cb && cb(null, result);
+-          });
++        if (err) {
++          cb && cb(err);
++          stop = true;
++        } else {
++          content.copy(result, offset.toNumber());
++          nbRemainingPackets--;
++          checkDone();
+         }
+       };
+-      // create packets
+-      var createPackets = function() {
+-        while (
+-          nbRemainingPackets < connection.packetConcurrency &&
+-          offset.lt(fileLength)
+-        ) {
+-          // process packet size
+-          var rest = offset.sub(fileLength).neg();
+-          var packetSize = rest.gt(MAX_READ_LENGTH)
+-            ? MAX_READ_LENGTH
+-            : rest.toNumber();
+-          // generate buffer
+-          SMB2Request(
+-            'read',
+-            {
+-              FileId: file.FileId,
+-              Length: packetSize,
+-              Offset: offset.toBuffer(),
+-            },
+-            connection,
+-            callback(offset)
+-          );
+-          offset = offset.add(packetSize);
+-          nbRemainingPackets++;
++    };
++
++    var checkDone = function() {
++      if (stop) return;
++      createPackets();
++      if (nbRemainingPackets === 0 && offset.ge(fileLength)) {
++        SMB2Request('close', file, connection, function() {
++          if (options.encoding) {
++            result = result.toString(options.encoding);
++          }
++          cb && cb(null, result);
++        });
++      }
++    };
++
++    var createPackets = function() {
++      while (
++        nbRemainingPackets < connection.packetConcurrency &&
++        offset.lt(fileLength)
++      ) {
++        var rest = offset.sub(fileLength).neg();
++        var packetSize = rest.gt(MAX_READ_LENGTH)
++          ? MAX_READ_LENGTH
++          : rest.toNumber();
++        SMB2Request(
++          'read',
++          {
++            FileId: file.FileId,
++            Length: packetSize,
++            Offset: offset.toBuffer(),
++          },
++          connection,
++          callback(offset)
++        );
++        offset = offset.add(packetSize);
++        nbRemainingPackets++;
++      }
++    };
++
++    checkDone();
++  }
++
++  // Sequential chunk read used when EndofFile is 0 from both CREATE and QUERY_INFO.
++  function readChunks(file) {
++    var chunks = [];
++    var offset = new BigInt(8);
++
++    var readNext = function() {
++      SMB2Request(
++        'read',
++        {
++          FileId: file.FileId,
++          Length: MAX_READ_LENGTH,
++          Offset: offset.toBuffer(),
++        },
++        connection,
++        function(err, content) {
++          if (err) {
++            if (err.code === 'STATUS_END_OF_FILE') {
++              SMB2Request('close', file, connection, function() {
++                var result = Buffer.concat(chunks);
++                if (options.encoding) {
++                  result = result.toString(options.encoding);
++                }
++                cb && cb(null, result);
++              });
++            } else {
++              cb && cb(err);
++            }
++          } else if (!content || content.length === 0) {
++            SMB2Request('close', file, connection, function() {
++              var result = Buffer.concat(chunks);
++              if (options.encoding) {
++                result = result.toString(options.encoding);
++              }
++              cb && cb(null, result);
++            });
++          } else {
++            chunks.push(content);
++            offset = offset.add(content.length);
++            readNext();
++          }
+         }
+-      };
+-      checkDone();
+-    }
+-  });
++      );
++    };
++
++    readNext();
++  }
+ };
+diff --git a/lib/messages/query_info.js b/lib/messages/query_info.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..3bcfd6f4f39a1beac45800cb68e17826d9f53b68
+--- /dev/null
++++ b/lib/messages/query_info.js
+@@ -0,0 +1,25 @@
++var SMB2Message = require('../tools/smb2-message');
++var message = require('../tools/message');
++
++module.exports = message({
++  generate: function(connection, params) {
++    return new SMB2Message({
++      headers: {
++        Command: 'QUERY_INFO',
++        SessionId: connection.SessionId,
++        TreeId: connection.TreeId,
++        ProcessId: connection.ProcessId,
++      },
++      request: {
++        FileId: params.FileId,
++      },
++    });
++  },
++
++  parseResponse: function(response) {
++    // FileStandardInformation layout: AllocationSize(8) EndOfFile(8) ...
++    // Return the EndOfFile bytes (offset 8-15) from the output buffer.
++    var buf = response.getResponse().Buffer;
++    return buf.slice(8, 16);
++  },
++});
 diff --git a/lib/messages/session_setup_step1.js b/lib/messages/session_setup_step1.js
 index 9cfba8fc50b13be35b15f264271ece86cbe49db4..1148d870346410b4963e0c7855edc0f79d2c92f3 100644
 --- a/lib/messages/session_setup_step1.js
@@ -31,3 +290,61 @@ index 04df64950934f6556c8c64f4b528f8eed0443c1d..a9fb173d0553c7bfea36693dfa04de09
            connection.password
          ),
        },
+diff --git a/lib/structures/query_info.js b/lib/structures/query_info.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..747eb32650d2c3857a1fd7c60b58347f4e46817d
+--- /dev/null
++++ b/lib/structures/query_info.js
+@@ -0,0 +1,22 @@
++module.exports = {
++  request: [
++    ['StructureSize', 2, 41],
++    ['InfoType', 1, 1],              // SMB2_0_INFO_FILE
++    ['FileInfoClass', 1, 5],         // FileStandardInformation
++    ['OutputBufferLength', 4, 24],   // FileStandardInformation is 24 bytes
++    ['InputBufferOffset', 2, 0x68],  // 64 (header) + 40 (fixed struct) = 104 = 0x68
++    ['Reserved', 2, 0],
++    ['InputBufferLength', 4, 0],
++    ['AdditionalInformation', 4, 0],
++    ['Flags', 4, 0],
++    ['FileId', 16],
++    ['Buffer', 'InputBufferLength'],
++  ],
++
++  response: [
++    ['StructureSize', 2],
++    ['OutputBufferOffset', 2],
++    ['OutputBufferLength', 4],
++    ['Buffer', 'OutputBufferLength'],
++  ],
++};
+diff --git a/lib/tools/smb2-forge.js b/lib/tools/smb2-forge.js
+index b5de345bbc744f20ba2878867afbd3cbb54af8e5..e3fe0ac0543f8fd74af62c1288906ee81565fa41 100644
+--- a/lib/tools/smb2-forge.js
++++ b/lib/tools/smb2-forge.js
+@@ -65,13 +65,20 @@ SMB2Forge.response = function(c) {
+           }
+           // get the message id
+           var mId = message.getHeaders().MessageId.toString('hex');
++          // STATUS_PENDING (0x00000103): async interim response — the server
++          // will send the real response with the same MessageId later.
++          // Keep the callback registered so the final response is dispatched.
++          var statusBuf = message.getHeaders().Status;
++          var isPending = statusBuf && statusBuf.readUInt32LE(0) === 0x00000103;
+           // check if the message can be dispatched
+           // or store it
+-          if (c.responsesCB[mId]) {
+-            c.responsesCB[mId](message);
+-            delete c.responsesCB[mId];
+-          } else {
+-            c.responses[mId] = message;
++          if (!isPending) {
++            if (c.responsesCB[mId]) {
++              c.responsesCB[mId](message);
++              delete c.responsesCB[mId];
++            } else {
++              c.responses[mId] = message;
++            }
+           }
+           // remove from response buffer
+           c.responseBuffer = c.responseBuffer.slice(msgLength + 4);

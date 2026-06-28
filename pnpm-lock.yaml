@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
-  '@marsaud/smb2@0.18.0': 3351732304f5dfee8c4abba0351ae507dc8a4467a60f0aa9d15259bcff59aa7c
+  '@marsaud/smb2@0.18.0': 73ab7ff66be51e8129ba98437098dfff9ae164fed2cbfeebe16ff277333542e9
   ntlm@0.1.3: ae17ba7a2c7b8646739192701e01ac0f1e8e8172cb3f798bf2aedc5e22fc9cca
 
 importers:
@@ -53,7 +53,7 @@ importers:
         version: 8.3.0
       '@marsaud/smb2':
         specifier: ^0.18.0
-        version: 0.18.0(patch_hash=3351732304f5dfee8c4abba0351ae507dc8a4467a60f0aa9d15259bcff59aa7c)
+        version: 0.18.0(patch_hash=73ab7ff66be51e8129ba98437098dfff9ae164fed2cbfeebe16ff277333542e9)
       '@polka/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -1496,7 +1496,7 @@ snapshots:
 
   '@lukeed/ms@2.0.2': {}
 
-  '@marsaud/smb2@0.18.0(patch_hash=3351732304f5dfee8c4abba0351ae507dc8a4467a60f0aa9d15259bcff59aa7c)':
+  '@marsaud/smb2@0.18.0(patch_hash=73ab7ff66be51e8129ba98437098dfff9ae164fed2cbfeebe16ff277333542e9)':
     dependencies:
       ntlm: 0.1.3(patch_hash=ae17ba7a2c7b8646739192701e01ac0f1e8e8172cb3f798bf2aedc5e22fc9cca)
       readable-stream: 3.6.2

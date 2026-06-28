@@ -31,8 +31,13 @@ export async function smbRoutes(app: FastifyInstance) {
       const buffer = await readFile(req.body, path);
       const ext = path.toLowerCase().split('.').pop();
       const mime = ext === 'epub' ? 'application/epub+zip' : 'application/octet-stream';
+      const filename = path.split('\\').pop() ?? '';
+      const encodedFilename = encodeURIComponent(filename);
       reply.header('Content-Type', mime);
-      reply.header('Content-Disposition', `attachment; filename="${path.split('\\').pop()}"`);
+      reply.header(
+        'Content-Disposition',
+        `attachment; filename="${filename.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodedFilename}`
+      );
       return reply.send(buffer);
     } catch (err) {
       return reply.code(400).send({ error: String(err) });

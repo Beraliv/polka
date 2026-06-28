@@ -40,8 +40,7 @@ export function removeBook(id: string): void {
 }
 
 export function setSMB(config: SMBConfig): void {
-  const { password: _pwd, ...safe } = config;
-  localStorage.setItem(SMB_KEY, JSON.stringify(safe));
+  localStorage.setItem(SMB_KEY, JSON.stringify(config));
   setStore('smb', config);
 }
 

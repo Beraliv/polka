@@ -43,7 +43,11 @@ export function SettingsPage() {
   }
 
   function handleSave() {
-    setSMB(buildConfig());
+    const config = buildConfig();
+    if (!config.password && existing?.password) {
+      config.password = existing.password;
+    }
+    setSMB(config);
     navigate('/');
   }
 

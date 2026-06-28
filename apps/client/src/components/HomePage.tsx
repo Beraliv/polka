@@ -7,6 +7,7 @@ import { parseFB2 } from '../lib/fb2.ts';
 import { paginate } from '../lib/paginate.ts';
 import { computeBookId } from '../lib/bookId.ts';
 import { downloadSMBFile } from '../lib/api.ts';
+import { loadProgress, saveProgress } from '../lib/progress.ts';
 import { BookCard } from './BookCard.tsx';
 import { FileBrowser } from './FileBrowser.tsx';
 import type { Book, BookFormat } from '@polka/shared';
@@ -17,6 +18,7 @@ export function HomePage() {
   let fileInput!: HTMLInputElement;
 
   const [adding, setAdding] = createSignal(false);
+  const [reopeningId, setReopeningId] = createSignal<string | null>(null);
   const [addError, setAddError] = createSignal('');
   const [showBrowser, setShowBrowser] = createSignal(false);
 
@@ -80,6 +82,18 @@ export function HomePage() {
     try {
       const buffer = await downloadSMBFile(store.smb, path);
       const bookId = await processBook(buffer, filename);
+      // Persist SMB path so re-download is possible after reload
+      const prev = loadProgress(bookId);
+      saveProgress({
+        bookId,
+        bookName: prev?.bookName ?? filename,
+        currentPage: prev?.currentPage ?? 0,
+        totalPages: (store.pages[bookId] ?? []).length,
+        percent: prev?.percent ?? 0,
+        lastRead: prev?.lastRead ?? Date.now(),
+        finished: prev?.finished ?? false,
+        smbPath: path,
+      });
       navigate(`/reader/${bookId}`);
     } catch (e) {
       setAddError(e instanceof Error ? e.message : String(e));
@@ -89,12 +103,34 @@ export function HomePage() {
   }
 
   function openBook(bookId: string) {
-    if (!store.pages[bookId]) {
+    setAddError('');
+    navigate(`/reader/${bookId}`);
+  }
+
+  async function reopenBook(bookId: string) {
+    if (!store.smb) {
+      setAddError('No SMB configuration found. Add your NAS credentials using "Browser NAS" and re-open this book to continue reading');
+      return;
+    }
+
+    const progress = loadProgress(bookId);
+    if (!progress?.smbPath) {
       setAddError('Re-open this book using "+" or "Browse NAS" to continue reading');
       return;
     }
+
+    setReopeningId(bookId);
     setAddError('');
-    navigate(`/reader/${bookId}`);
+    try {
+      const filename = progress.smbPath.split('\\').pop() ?? progress.smbPath;
+      const buffer = await downloadSMBFile(store.smb, progress.smbPath);
+      await processBook(buffer, filename);
+      navigate(`/reader/${bookId}`);
+    } catch (e) {
+      setAddError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setReopeningId(null);
+    }
   }
 
   return (
@@ -129,6 +165,8 @@ export function HomePage() {
                 progress={progressMap()[book.id]}
                 available={!!store.pages[book.id]}
                 onOpen={() => openBook(book.id)}
+                onReopen={() => void reopenBook(book.id)}
+                loading={reopeningId() === book.id}
                 onRemove={() => removeBook(book.id)}
               />
             )}
@@ -146,6 +184,8 @@ export function HomePage() {
                 progress={progressMap()[book.id]}
                 available={!!store.pages[book.id]}
                 onOpen={() => openBook(book.id)}
+                onReopen={() => void reopenBook(book.id)}
+                loading={reopeningId() === book.id}
                 onRemove={() => removeBook(book.id)}
               />
             )}

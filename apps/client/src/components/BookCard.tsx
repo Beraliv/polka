@@ -5,7 +5,9 @@ type Props = {
   book: Book;
   progress?: Progress;
   available: boolean;
+  loading?: boolean;
   onOpen: () => void;
+  onReopen: () => void;
   onRemove: () => void;
 };
 
@@ -15,11 +17,19 @@ export function BookCard(props: Props) {
     props.onRemove();
   }
 
+  function handleClick() {
+    if (props.available) {
+      props.onOpen();
+    } else {
+      props.onReopen();
+    }
+  }
+
   return (
     <div
-      class={`book-card${props.available ? '' : ' unavailable'}`}
-      onClick={() => props.available && props.onOpen()}
-      title={props.available ? undefined : 'Re-open this book to continue reading'}
+      class={`book-card${props.available ? '' : ' unavailable'}${props.loading ? ' loading' : ''}`}
+      onClick={handleClick}
+      title={props.available ? undefined : 'Tap to re-download from NAS'}
     >
       <div class="book-cover-placeholder">
         <span class="book-format-badge">{props.book.format}</span>

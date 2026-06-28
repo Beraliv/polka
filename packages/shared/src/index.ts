@@ -17,6 +17,7 @@ export type Progress = {
   percent: number;
   lastRead: number;
   finished: boolean;
+  smbPath?: string;
 };
 
 export type SMBConfig = {

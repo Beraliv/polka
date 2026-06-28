@@ -14,6 +14,7 @@ export function ReaderPage() {
 
   const [pageIdx, setPageIdx] = createSignal(0);
   const [ready, setReady] = createSignal(false);
+  let smbPath: string | undefined;
 
   function nextPage() {
     setPageIdx((i) => Math.min(i + 1, pages().length - 1));
@@ -38,8 +39,11 @@ export function ReaderPage() {
 
     // Load progress
     const local = loadProgress(bookId);
-    if (local && local.currentPage > 0) {
-      setPageIdx(Math.min(local.currentPage - 1, pages().length - 1));
+    if (local) {
+      smbPath = local.smbPath;
+      if (local.currentPage > 0) {
+        setPageIdx(Math.min(local.currentPage - 1, pages().length - 1));
+      }
     }
 
     // Async: merge with remote (use whichever page is further)
@@ -84,6 +88,7 @@ export function ReaderPage() {
       percent: Math.round(((idx + 1) / total) * 100),
       lastRead: Date.now(),
       finished: idx + 1 >= total,
+      smbPath,
     };
     saveProgress(progress);
   });

@@ -136,6 +136,8 @@ export function ReaderPage() {
   let smbPath: string | undefined;
   let contentEl: HTMLDivElement | undefined;
   let seekInputEl: HTMLInputElement | undefined;
+  let touchStartX = 0;
+  let touchStartY = 0;
 
   function openSeek() {
     setSeekValue(String(pageIdx() + 1));
@@ -259,21 +261,19 @@ export function ReaderPage() {
     saveProgress(progress);
   });
 
-  let touchStartX = 0;
-  let touchStartY = 0;
-
-  function handleTouchStart(e: TouchEvent) {
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
+  function handleContentTouchStart(e: TouchEvent) {
+    const t = e.touches[0];
+    if (t) { touchStartX = t.clientX; touchStartY = t.clientY; }
   }
 
-  function handleTouchEnd(e: TouchEvent) {
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    const dy = e.changedTouches[0].clientY - touchStartY;
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
-      if (dx < 0) nextPage();
-      else prevPage();
-    }
+  function handleContentTouchEnd(e: TouchEvent) {
+    const t = e.changedTouches[0];
+    if (!t) return;
+    if (Math.abs(t.clientX - touchStartX) > 10 || Math.abs(t.clientY - touchStartY) > 10) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const zone = 2 * parseFloat(getComputedStyle(document.documentElement).fontSize);
+    if (t.clientX < rect.left + zone) prevPage();
+    else if (t.clientX > rect.right - zone) nextPage();
   }
 
   const currentPage = () => localPages()[pageIdx()] ?? [];
@@ -281,11 +281,7 @@ export function ReaderPage() {
   const percent = () => (total() > 0 ? Math.round(((pageIdx() + 1) / total()) * 100) : 0);
 
   return (
-    <div
-      class="reader"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
+    <div class="reader">
       <div class="reader-header">
         <button class="icon-btn" onClick={() => navigate('/')} title="Back">←</button>
         <span class="reader-book-title">{book()?.name ?? ''}</span>
@@ -312,7 +308,34 @@ export function ReaderPage() {
         </Show>
       </div>
 
-      <div class="reader-content" ref={contentEl}>
+      <div
+        class="reader-content"
+        ref={contentEl}
+        onTouchStart={handleContentTouchStart}
+        onTouchEnd={handleContentTouchEnd}
+      >
+        <button
+          class="reader-nav-overlay reader-nav-overlay--prev"
+          onClick={prevPage}
+          disabled={pageIdx() === 0}
+          title="Previous page"
+          aria-label="Previous page"
+        >
+          <svg width="10" height="18" viewBox="0 0 10 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 2L2 9L8 16" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button
+          class="reader-nav-overlay reader-nav-overlay--next"
+          onClick={nextPage}
+          disabled={pageIdx() >= total() - 1}
+          title="Next page"
+          aria-label="Next page"
+        >
+          <svg width="10" height="18" viewBox="0 0 10 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2 2L8 9L2 16" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
         <Show when={!ready()}>
           <div class="reader-loading"><span class="spinner" /></div>
         </Show>
@@ -330,28 +353,12 @@ export function ReaderPage() {
       </div>
 
       <div class="reader-footer">
-        <button
-          class="reader-nav-btn"
-          onClick={prevPage}
-          disabled={pageIdx() === 0}
-          title="Previous page"
-        >
-          ‹
-        </button>
         <div class="reader-progress-wrap">
           <div class="reader-progress-bar">
             <div class="reader-progress-fill" style={{ width: `${percent()}%` }} />
           </div>
           <div class="reader-percent">{percent()}%</div>
         </div>
-        <button
-          class="reader-nav-btn"
-          onClick={nextPage}
-          disabled={pageIdx() >= total() - 1}
-          title="Next page"
-        >
-          ›
-        </button>
       </div>
     </div>
   );

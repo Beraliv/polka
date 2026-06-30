@@ -49,7 +49,7 @@ Progress JSON files are stored in a named Docker volume (`progress_data`) mounte
 3. Tap **Test Connection** to verify, then **Save**
 4. Back on the home screen, tap **Browse NAS** to pick a book
 
-The password is never written to disk — it lives in memory for the session only.
+The password is saved to localStorage so the NAS reconnects automatically on reload. If a book becomes unavailable after a reload, tap its card to re-download it from the NAS.
 
 ## Tech stack
 

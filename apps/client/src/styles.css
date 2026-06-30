@@ -426,6 +426,7 @@ h5.reader-section-title { font-size: 0.9rem; }
   font-size: 1.4rem;
   flex-shrink: 0;
   transition: background 0.15s;
+  touch-action: manipulation;
 }
 
 .reader-nav-btn:hover,

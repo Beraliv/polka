@@ -131,8 +131,31 @@ export function ReaderPage() {
   const [pageIdx, setPageIdx] = createSignal(0);
   const [localPages, setLocalPages] = createSignal<Page[]>([]);
   const [ready, setReady] = createSignal(false);
+  const [seeking, setSeeking] = createSignal(false);
+  const [seekValue, setSeekValue] = createSignal('');
   let smbPath: string | undefined;
   let contentEl: HTMLDivElement | undefined;
+  let seekInputEl: HTMLInputElement | undefined;
+
+  function openSeek() {
+    setSeekValue(String(pageIdx() + 1));
+    setSeeking(true);
+    requestAnimationFrame(() => seekInputEl?.select());
+  }
+
+  function commitSeek() {
+    if (!seeking()) return;
+    const n = parseInt(seekValue(), 10);
+    if (!isNaN(n)) {
+      setPageIdx(Math.min(Math.max(n - 1, 0), total() - 1));
+      scrollToTop();
+    }
+    setSeeking(false);
+  }
+
+  function cancelSeek() {
+    setSeeking(false);
+  }
 
   function repaginate(restorePercent: number) {
     if (!contentEl) return;
@@ -195,7 +218,8 @@ export function ReaderPage() {
         e.preventDefault();
         prevPage();
       } else if (e.key === 'Escape') {
-        navigate('/');
+        if (seeking()) cancelSeek();
+        else navigate('/');
       }
     };
     document.addEventListener('keydown', handleKey);
@@ -260,7 +284,27 @@ export function ReaderPage() {
       <div class="reader-header">
         <button class="icon-btn" onClick={() => navigate('/')} title="Back">←</button>
         <span class="reader-book-title">{book()?.name ?? ''}</span>
-        <span class="reader-page-info">{pageIdx() + 1} / {total()}</span>
+        <Show when={seeking()} fallback={
+          <span class="reader-page-info" onClick={openSeek} title="Go to page">
+            {pageIdx() + 1} / {total()}
+          </span>
+        }>
+          <input
+            ref={seekInputEl}
+            class="reader-page-input"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={seekValue()}
+            onInput={(e) => setSeekValue(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Enter') { e.preventDefault(); commitSeek(); }
+              else if (e.key === 'Escape') { e.preventDefault(); cancelSeek(); }
+            }}
+            onBlur={commitSeek}
+          />
+        </Show>
       </div>
 
       <div class="reader-content" ref={contentEl}>

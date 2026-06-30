@@ -338,12 +338,33 @@ a {
 
 .reader-content {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 24px 20px;
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 1.05rem;
   line-height: 1.85;
+  position: relative;
 }
+
+.reader-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reader-section-title {
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 1em;
+}
+
+h1.reader-section-title { font-size: 1.5rem; }
+h2.reader-section-title { font-size: 1.3rem; }
+h3.reader-section-title { font-size: 1.15rem; }
+h4.reader-section-title { font-size: 1rem; }
+h5.reader-section-title { font-size: 0.9rem; }
 
 .reader-paragraph {
   margin-bottom: 1.2em;
@@ -354,16 +375,14 @@ a {
   text-indent: 0;
 }
 
+.reader-paragraph:last-child {
+  margin-bottom: 0;
+}
+
 @media (min-width: 900px) {
   .reader-content {
-    columns: 2;
-    column-gap: 4em;
     padding: 32px 64px;
     font-size: 1.1rem;
-  }
-
-  .reader-paragraph {
-    break-inside: avoid;
   }
 }
 

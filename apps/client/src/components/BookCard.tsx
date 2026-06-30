@@ -41,7 +41,11 @@ export function BookCard(props: Props) {
         </Show>
         <Show
           when={props.progress}
-          fallback={<div class="progress-text">{props.book.totalPages} pages</div>}
+          fallback={
+            <Show when={props.book.totalPages > 0}>
+              <div class="progress-text">{props.book.totalPages} pages</div>
+            </Show>
+          }
         >
           {(p) => (
             <>

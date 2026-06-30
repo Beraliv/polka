@@ -1,23 +1,155 @@
-import { createSignal, createEffect, For, Show, onMount, onCleanup } from 'solid-js';
+import { createSignal, createEffect, For, Show, onMount, onCleanup, batch } from 'solid-js';
+import { Dynamic } from 'solid-js/web';
 import { useNavigate, useParams } from '@solidjs/router';
-import { store } from '../store/books.ts';
+import { store, updateBookTotalPages } from '../store/books.ts';
 import { loadProgress, loadRemoteProgress, saveProgress } from '../lib/progress.ts';
+import type { SectionItem, Page } from '../lib/paginate.ts';
 import type { Progress } from '@polka/shared';
+
+function maxFittingWords(
+  container: HTMLElement,
+  words: string[],
+  availH: number,
+): number {
+  const el = document.createElement('p');
+  el.className = 'reader-paragraph';
+  let lo = 0, hi = words.length - 1, count = 0;
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    el.textContent = words.slice(0, mid + 1).join(' ');
+    container.appendChild(el);
+    const fits = container.scrollHeight <= availH;
+    container.removeChild(el);
+    if (fits) { count = mid + 1; lo = mid + 1; } else { hi = mid - 1; }
+  }
+  return count;
+}
+
+function buildPages(contentEl: HTMLElement, sections: SectionItem[]): Page[] {
+  const availH = contentEl.clientHeight;
+  const availW = contentEl.clientWidth;
+  if (availH <= 0 || availW <= 0 || sections.length === 0) return [];
+
+  // Mirror the real content element's computed styles so measurements are accurate
+  const cs = window.getComputedStyle(contentEl);
+  const container = document.createElement('div');
+  container.style.cssText = [
+    'position:fixed',
+    'visibility:hidden',
+    'top:-9999px',
+    'left:0',
+    `width:${availW}px`,
+    'box-sizing:border-box',
+    `padding:${cs.paddingTop} ${cs.paddingRight} ${cs.paddingBottom} ${cs.paddingLeft}`,
+    `font-family:${cs.fontFamily}`,
+    `font-size:${cs.fontSize}`,
+    `line-height:${cs.lineHeight}`,
+    'overflow:visible',
+    'height:auto',
+  ].join(';');
+  document.body.appendChild(container);
+
+  const pages: Page[] = [];
+
+  const flush = (current: Page) => {
+    pages.push(current);
+    container.innerHTML = '';
+  };
+
+  for (const section of sections) {
+    container.innerHTML = '';
+    let current: Page = [];
+
+    if (section.title) {
+      const level = Math.min(Math.max(section.level ?? 1, 1), 5);
+      current.push({ title: section.title, level });
+      const h = document.createElement(`h${level}`);
+      h.className = 'reader-section-title';
+      h.textContent = section.title;
+      container.appendChild(h);
+    }
+
+    for (const para of section.paragraphs) {
+      let remaining = para;
+
+      while (remaining.length > 0) {
+        const el = document.createElement('p');
+        el.className = 'reader-paragraph';
+        el.textContent = remaining;
+        container.appendChild(el);
+
+        if (container.scrollHeight <= availH) {
+          // Entire remaining text fits on this page
+          current.push({ content: remaining });
+          remaining = '';
+        } else {
+          // Overflow — try to fit as many words as possible
+          container.removeChild(el);
+          const words = remaining.split(' ');
+          const fitting = maxFittingWords(container, words, availH);
+
+          if (fitting > 0) {
+            // Put fitting words on current page, carry the rest forward
+            current.push({ content: words.slice(0, fitting).join(' ') });
+            remaining = words.slice(fitting).join(' ');
+            flush(current);
+            current = [];
+          } else if (current.length > 0) {
+            // Nothing fits on the current page — flush it and retry on a fresh page
+            flush(current);
+            current = [];
+          } else {
+            // Empty page and still nothing fits (paragraph larger than a full page)
+            // Include it as-is to avoid an infinite loop
+            current.push({ content: remaining });
+            remaining = '';
+            flush(current);
+            current = [];
+          }
+        }
+      }
+    }
+
+    // Section ends: flush remaining page only if it has content
+    if (current.length > 0) {
+      pages.push(current);
+    }
+    container.innerHTML = '';
+  }
+
+  document.body.removeChild(container);
+  return pages;
+}
 
 export function ReaderPage() {
   const params = useParams<{ id: string }>();
   const navigate = useNavigate();
   const bookId = params.id;
 
-  const pages = () => store.pages[bookId] ?? [];
   const book = () => store.books.find((b) => b.id === bookId);
 
   const [pageIdx, setPageIdx] = createSignal(0);
+  const [localPages, setLocalPages] = createSignal<Page[]>([]);
   const [ready, setReady] = createSignal(false);
   let smbPath: string | undefined;
+  let contentEl: HTMLDivElement | undefined;
+
+  function repaginate(restorePercent: number) {
+    if (!contentEl) return;
+    const sections = store.sections[bookId];
+    if (!sections?.length) return;
+
+    const built = buildPages(contentEl, sections);
+    updateBookTotalPages(bookId, built.length);
+    batch(() => {
+      setLocalPages(built);
+      setPageIdx(Math.round(restorePercent * Math.max(0, built.length - 1)));
+      setReady(true);
+    });
+  }
 
   function nextPage() {
-    setPageIdx((i) => Math.min(i + 1, pages().length - 1));
+    setPageIdx((i) => Math.min(i + 1, localPages().length - 1));
     scrollToTop();
   }
 
@@ -26,38 +158,35 @@ export function ReaderPage() {
     scrollToTop();
   }
 
-  let contentEl: HTMLDivElement | undefined;
   function scrollToTop() {
     contentEl?.scrollTo({ top: 0 });
   }
 
   onMount(() => {
-    if (!store.pages[bookId]) {
+    if (!store.sections[bookId]) {
       navigate('/');
       return;
     }
 
-    // Load progress
     const local = loadProgress(bookId);
-    if (local) {
-      smbPath = local.smbPath;
-      if (local.currentPage > 0) {
-        setPageIdx(Math.min(local.currentPage - 1, pages().length - 1));
-      }
-    }
+    smbPath = local?.smbPath;
+    const savedPercent = local ? local.percent / 100 : 0;
 
-    // Async: merge with remote (use whichever page is further)
     void loadRemoteProgress(bookId).then((remote) => {
       if (!remote) return;
-      const localPage = local?.currentPage ?? 0;
-      if (remote.currentPage > localPage) {
-        setPageIdx(Math.min(remote.currentPage - 1, pages().length - 1));
+      const localPercent = local?.percent ?? 0;
+      if (remote.percent > localPercent) {
+        const total = localPages().length;
+        if (total > 0) {
+          setPageIdx(Math.round((remote.percent / 100) * Math.max(0, total - 1)));
+        }
       }
     });
 
-    setReady(true);
+    requestAnimationFrame(() => {
+      repaginate(savedPercent);
+    });
 
-    // Keyboard navigation
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
         e.preventDefault();
@@ -71,14 +200,22 @@ export function ReaderPage() {
     };
     document.addEventListener('keydown', handleKey);
     onCleanup(() => document.removeEventListener('keydown', handleKey));
+
+    const handleResize = () => {
+      const currentPercent =
+        localPages().length > 1 ? pageIdx() / (localPages().length - 1) : 0;
+      batch(() => setReady(false));
+      requestAnimationFrame(() => repaginate(currentPercent));
+    };
+    window.addEventListener('resize', handleResize);
+    onCleanup(() => window.removeEventListener('resize', handleResize));
   });
 
-  // Save progress on page change (after initial load)
   createEffect(() => {
     if (!ready()) return;
     const idx = pageIdx();
     const b = book();
-    const total = pages().length;
+    const total = localPages().length;
     if (!b || total === 0) return;
     const progress: Progress = {
       bookId,
@@ -93,7 +230,6 @@ export function ReaderPage() {
     saveProgress(progress);
   });
 
-  // Touch/swipe
   let touchStartX = 0;
   let touchStartY = 0;
 
@@ -111,8 +247,8 @@ export function ReaderPage() {
     }
   }
 
-  const currentPage = () => pages()[pageIdx()] ?? [];
-  const total = () => pages().length;
+  const currentPage = () => localPages()[pageIdx()] ?? [];
+  const total = () => localPages().length;
   const percent = () => (total() > 0 ? Math.round(((pageIdx() + 1) / total()) * 100) : 0);
 
   return (
@@ -128,13 +264,19 @@ export function ReaderPage() {
       </div>
 
       <div class="reader-content" ref={contentEl}>
-        <For each={currentPage()}>
-          {(paragraph) => <p class="reader-paragraph">{paragraph}</p>}
-        </For>
-        <Show when={currentPage().length === 0}>
-          <p class="reader-paragraph" style={{ color: 'var(--text-muted)' }}>
-            (empty page)
-          </p>
+        <Show when={!ready()}>
+          <div class="reader-loading"><span class="spinner" /></div>
+        </Show>
+        <Show when={ready()}>
+          <For each={currentPage()}>
+            {(item) => (
+              <Show when={item.content} fallback={
+                <Dynamic component={`h${item.level ?? 1}`} class="reader-section-title">{item.title}</Dynamic>
+              }>
+                <p class="reader-paragraph">{item.content}</p>
+              </Show>
+            )}
+          </For>
         </Show>
       </div>
 

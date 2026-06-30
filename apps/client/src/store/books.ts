@@ -1,6 +1,6 @@
 import { createStore } from 'solid-js/store';
 import type { Book, SMBConfig } from '@polka/shared';
-import type { Page } from '../lib/paginate.ts';
+import type { SectionItem } from '../lib/paginate.ts';
 
 const BOOKS_KEY = 'polka:books';
 const SMB_KEY = 'polka:smb';
@@ -17,18 +17,26 @@ function load<T>(key: string, fallback: T): T {
 const [store, setStore] = createStore({
   books: load<Book[]>(BOOKS_KEY, []),
   smb: load<SMBConfig | null>(SMB_KEY, null),
-  pages: {} as Record<string, Page[]>,
+  sections: {} as Record<string, SectionItem[]>,
 });
 
 export { store };
 
-export function addBook(book: Book, pages: Page[]): void {
+export function addBook(book: Book, sections: SectionItem[]): void {
   setStore('books', (prev) => {
     const next = [book, ...prev.filter((b) => b.id !== book.id)];
     localStorage.setItem(BOOKS_KEY, JSON.stringify(next));
     return next;
   });
-  setStore('pages', book.id, pages);
+  setStore('sections', book.id, sections);
+}
+
+export function updateBookTotalPages(id: string, totalPages: number): void {
+  setStore('books', (prev) => {
+    const next = prev.map((b) => (b.id === id ? { ...b, totalPages } : b));
+    localStorage.setItem(BOOKS_KEY, JSON.stringify(next));
+    return next;
+  });
 }
 
 export function removeBook(id: string): void {

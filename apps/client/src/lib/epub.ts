@@ -1,23 +1,30 @@
 import { unzipSync } from 'fflate';
+import type { SectionItem } from './paginate.ts';
 
 export type ParsedBook = {
   title: string;
   author?: string;
-  paragraphs: string[];
+  sections: SectionItem[];
 };
 
 function decode(bytes: Uint8Array): string {
   return new TextDecoder('utf-8').decode(bytes);
 }
 
-function extractParagraphs(html: string): string[] {
+function extractSectionItem(html: string): SectionItem {
   const doc = new DOMParser().parseFromString(html, 'text/html');
-  const result: string[] = [];
+
+  // First heading element becomes the section title
+  const headingEl = doc.querySelector('h1, h2, h3');
+  const title = headingEl?.textContent?.trim() || undefined;
+
+  const paragraphs: string[] = [];
   doc.querySelectorAll('p, li').forEach((el) => {
     const text = el.textContent?.trim();
-    if (text) result.push(text);
+    if (text) paragraphs.push(text);
   });
-  return result;
+
+  return { level: 1, title, paragraphs };
 }
 
 export function parseEPUB(buffer: ArrayBuffer): ParsedBook {
@@ -62,14 +69,16 @@ export function parseEPUB(buffer: ArrayBuffer): ParsedBook {
     }
   });
 
-  // Extract paragraphs from each spine item
-  const paragraphs: string[] = [];
+  // Each spine item is a section
+  const sections: SectionItem[] = [];
   for (const href of spineItems) {
     const bytes = files[href];
     if (!bytes) continue;
-    const html = decode(bytes);
-    paragraphs.push(...extractParagraphs(html));
+    const section = extractSectionItem(decode(bytes));
+    if (section.paragraphs.length > 0 || section.title) {
+      sections.push(section);
+    }
   }
 
-  return { title, author, paragraphs };
+  return { title, author, sections };
 }

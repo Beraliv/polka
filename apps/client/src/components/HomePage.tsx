@@ -4,7 +4,6 @@ import { store, addBook, removeBook } from '../store/books.ts';
 import { allProgress } from '../lib/progress.ts';
 import { parseEPUB } from '../lib/epub.ts';
 import { parseFB2 } from '../lib/fb2.ts';
-import { paginate } from '../lib/paginate.ts';
 import { computeBookId } from '../lib/bookId.ts';
 import { downloadSMBFile } from '../lib/api.ts';
 import { loadProgress, saveProgress } from '../lib/progress.ts';
@@ -36,20 +35,19 @@ export function HomePage() {
     store.books.filter((b) => !!progressMap()[b.id]?.finished)
   );
 
-  async function processBook(buffer: ArrayBuffer, filename: string): Promise<string> {
+  function processBook(buffer: ArrayBuffer, filename: string): string {
     const ext = filename.split('.').pop()?.toLowerCase() as BookFormat;
-    const bookId = await computeBookId(buffer);
+    const bookId = computeBookId(buffer);
     const parsed = ext === 'epub' ? parseEPUB(buffer) : parseFB2(buffer);
-    const pages = paginate(parsed.paragraphs);
     const book: Book = {
       id: bookId,
       name: parsed.title || filename,
       author: parsed.author,
       format: ext,
-      totalPages: pages.length,
+      totalPages: 0,
       addedAt: Date.now(),
     };
-    addBook(book, pages);
+    addBook(book, parsed.sections);
     return bookId;
   }
 
@@ -64,7 +62,7 @@ export function HomePage() {
     setAddError('');
     try {
       const buffer = await file.arrayBuffer();
-      const bookId = await processBook(buffer, file.name);
+      const bookId = processBook(buffer, file.name);
       navigate(`/reader/${bookId}`);
     } catch (e) {
       setAddError(e instanceof Error ? e.message : String(e));
@@ -81,14 +79,14 @@ export function HomePage() {
     setAddError('');
     try {
       const buffer = await downloadSMBFile(store.smb, path);
-      const bookId = await processBook(buffer, filename);
+      const bookId = processBook(buffer, filename);
       // Persist SMB path so re-download is possible after reload
       const prev = loadProgress(bookId);
       saveProgress({
         bookId,
         bookName: prev?.bookName ?? filename,
         currentPage: prev?.currentPage ?? 0,
-        totalPages: (store.pages[bookId] ?? []).length,
+        totalPages: prev?.totalPages ?? 0,
         percent: prev?.percent ?? 0,
         lastRead: prev?.lastRead ?? Date.now(),
         finished: prev?.finished ?? false,
@@ -124,7 +122,7 @@ export function HomePage() {
     try {
       const filename = progress.smbPath.split('\\').pop() ?? progress.smbPath;
       const buffer = await downloadSMBFile(store.smb, progress.smbPath);
-      await processBook(buffer, filename);
+      processBook(buffer, filename);
       navigate(`/reader/${bookId}`);
     } catch (e) {
       setAddError(e instanceof Error ? e.message : String(e));
@@ -163,7 +161,7 @@ export function HomePage() {
               <BookCard
                 book={book}
                 progress={progressMap()[book.id]}
-                available={!!store.pages[book.id]}
+                available={!!store.sections[book.id]}
                 onOpen={() => openBook(book.id)}
                 onReopen={() => void reopenBook(book.id)}
                 loading={reopeningId() === book.id}
@@ -182,7 +180,7 @@ export function HomePage() {
               <BookCard
                 book={book}
                 progress={progressMap()[book.id]}
-                available={!!store.pages[book.id]}
+                available={!!store.sections[book.id]}
                 onOpen={() => openBook(book.id)}
                 onReopen={() => void reopenBook(book.id)}
                 loading={reopeningId() === book.id}

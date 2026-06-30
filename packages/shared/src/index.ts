@@ -4,6 +4,7 @@ export type Book = {
   id: string;
   name: string;
   author?: string;
+  lang?: string;
   format: BookFormat;
   totalPages: number;
   addedAt: number;

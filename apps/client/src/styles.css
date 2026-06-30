@@ -389,6 +389,8 @@ h5.reader-section-title { font-size: 0.9rem; }
 .reader-paragraph {
   margin-bottom: 1.2em;
   text-indent: 1.5em;
+  text-align: justify;
+  hyphens: auto;
 }
 
 .reader-paragraph:first-child {

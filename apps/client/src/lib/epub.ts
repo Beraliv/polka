@@ -4,6 +4,7 @@ import type { SectionItem } from './paginate.ts';
 export type ParsedBook = {
   title: string;
   author?: string;
+  lang?: string;
   sections: SectionItem[];
 };
 

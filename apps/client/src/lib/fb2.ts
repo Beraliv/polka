@@ -3,6 +3,7 @@ import type { SectionItem } from './paginate.ts';
 export type ParsedBook = {
   title: string;
   author?: string;
+  lang?: string;
   sections: SectionItem[];
 };
 
@@ -80,6 +81,8 @@ export function parseFB2(buffer: ArrayBuffer): ParsedBook {
   const author =
     [firstNameEl?.textContent, lastNameEl?.textContent].filter(Boolean).join(' ') || undefined;
 
+  const lang = doc.querySelector('title-info > lang')?.textContent?.trim() || undefined;
+
   const sections: SectionItem[] = [];
 
   doc.querySelectorAll('FictionBook > body').forEach((body) => {
@@ -99,5 +102,5 @@ export function parseFB2(buffer: ArrayBuffer): ParsedBook {
     }
   });
 
-  return { title, author, sections };
+  return { title, author, lang, sections };
 }

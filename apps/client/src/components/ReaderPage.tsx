@@ -191,6 +191,11 @@ export function ReaderPage() {
       return;
     }
 
+    const originalLang = document.documentElement.lang;
+    const bookLang = book()?.lang;
+    if (bookLang) document.documentElement.lang = bookLang;
+    onCleanup(() => { document.documentElement.lang = originalLang; });
+
     const local = loadProgress(bookId);
     smbPath = local?.smbPath;
     const savedPercent = local ? local.percent / 100 : 0;

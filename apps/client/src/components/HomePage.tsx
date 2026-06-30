@@ -43,6 +43,7 @@ export function HomePage() {
       id: bookId,
       name: parsed.title || filename,
       author: parsed.author,
+      lang: parsed.lang,
       format: ext,
       totalPages: 0,
       addedAt: Date.now(),

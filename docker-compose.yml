@@ -7,6 +7,9 @@ services:
       PORT: "3001"
       HOST: "0.0.0.0"
       PROGRESS_PATH: "/data/progress"
+      ALLOWED_ORIGIN: "${ALLOWED_ORIGIN:-}"
+    ports:
+      - "${SERVER_PORT:-3001}:3001"
     volumes:
       - progress_data:/data/progress
     restart: unless-stopped

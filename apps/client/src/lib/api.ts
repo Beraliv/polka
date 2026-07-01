@@ -1,7 +1,12 @@
 import type { SMBConfig, FileEntry } from '@polka/shared';
+import { store } from '../store/books.ts';
 
-export async function testSMB(config: SMBConfig): Promise<void> {
-  const res = await fetch('/api/smb/test', {
+function apiUrl(path: string, serverUrl = store.serverUrl): string {
+  return `${serverUrl}${path}`;
+}
+
+export async function testSMB({ config, serverUrl }: { config: SMBConfig; serverUrl?: string }): Promise<void> {
+  const res = await fetch(apiUrl('/api/smb/test', serverUrl ?? store.serverUrl), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config),
@@ -13,7 +18,7 @@ export async function testSMB(config: SMBConfig): Promise<void> {
 }
 
 export async function listSMBFiles(config: SMBConfig, path = ''): Promise<FileEntry[]> {
-  const res = await fetch('/api/smb/files', {
+  const res = await fetch(apiUrl('/api/smb/files'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...config, path }),
@@ -23,7 +28,7 @@ export async function listSMBFiles(config: SMBConfig, path = ''): Promise<FileEn
 }
 
 export async function downloadSMBFile(config: SMBConfig, path: string): Promise<ArrayBuffer> {
-  const res = await fetch('/api/smb/file', {
+  const res = await fetch(apiUrl('/api/smb/file'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...config, path }),

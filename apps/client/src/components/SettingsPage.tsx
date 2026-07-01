@@ -8,6 +8,7 @@ export function SettingsPage() {
   const navigate = useNavigate();
   const existing = store.smb;
 
+  const [serverUrl, setServerUrl] = createSignal(store.serverUrl ?? '');
   const [ip, setIp] = createSignal(existing?.ip ?? '');
   const [port, setPort] = createSignal(String(existing?.port ?? 445));
   const [username, setUsername] = createSignal(existing?.username ?? '');
@@ -31,7 +32,7 @@ export function SettingsPage() {
     setBusy(true);
     setStatus('idle');
     try {
-      await testSMB(buildConfig());
+      await testSMB({ config: buildConfig(), serverUrl: serverUrl().trim().replace(/\/+$/, '') });
       setStatus('ok');
       setStatusMsg('Connection successful');
     } catch (e) {
@@ -43,6 +44,12 @@ export function SettingsPage() {
   }
 
   function handleSave() {
+    const url = serverUrl();
+    if (url.trim()) {
+      BookStore.saveServerUrl(url);
+    } else {
+      BookStore.deleteServerUrl();
+    }
     const config = buildConfig();
     if (!config.password && existing?.password) {
       config.password = existing.password;
@@ -65,6 +72,17 @@ export function SettingsPage() {
       </div>
 
       <div class="settings-form">
+        <div class="field">
+          <label>Server URL</label>
+          <input
+            type="url"
+            inputmode="url"
+            placeholder="http://100.111.45.19:3001"
+            value={serverUrl()}
+            onInput={(e) => setServerUrl(e.currentTarget.value)}
+          />
+          <p class="field-hint">Address of your self-hosted Polka server. Leave blank when the app is served from the same server.</p>
+        </div>
         <div class="field">
           <label>IP Address</label>
           <input

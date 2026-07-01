@@ -16,7 +16,14 @@ process.on('uncaughtException', (err) => {
 
 const app = Fastify({ logger: { level: 'info' } });
 
-await app.register(cors, { origin: true });
+const allowedOrigins = process.env.ALLOWED_ORIGIN
+  ? process.env.ALLOWED_ORIGIN.split(',').map((s) => s.trim())
+  : [];
+
+await app.register(cors, {
+  origin: allowedOrigins.length > 0 ? allowedOrigins : false,
+  methods: ['GET', 'POST', 'OPTIONS'],
+});
 
 // Serve client build in production
 const clientBuildPath = join(__dirname, '../../client/dist');

@@ -5,6 +5,7 @@ import { BookFilesDB, ProgressDB } from '../lib/polka-db.ts';
 
 const BOOKS_KEY = 'polka:books';
 const SMB_KEY = 'polka:smb';
+const SERVER_URL_KEY = 'polka:server-url';
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -18,6 +19,7 @@ function load<T>(key: string, fallback: T): T {
 const [store, setStore] = createStore({
   books: load<Book[]>(BOOKS_KEY, []),
   smb: load<SMBConfig | null>(SMB_KEY, null),
+  serverUrl: load<string>(SERVER_URL_KEY, ''),
   sections: {} as Record<string, SectionItem[]>,
   notes: {} as Record<string, Record<string, Note>>,
 });
@@ -91,6 +93,25 @@ export class BookStore {
     } catch (error) {
       console.error(`[deleteBook] Failed to delete book ${id} from IndexedDB:`, error);
     }
+  }
+
+  static saveServerUrl(url: string): void {
+    const trimmed = url.trim().replace(/\/+$/, '');
+    try {
+      localStorage.setItem(SERVER_URL_KEY, JSON.stringify(trimmed));
+    } catch (error) {
+      console.error('[saveServerUrl] Failed to save server URL to local storage:', error);
+    }
+    setStore('serverUrl', trimmed);
+  }
+
+  static deleteServerUrl(): void {
+    try {
+      localStorage.removeItem(SERVER_URL_KEY);
+    } catch (error) {
+      console.error('[deleteServerUrl] Failed to delete server URL from local storage:', error);
+    }
+    setStore('serverUrl', '');
   }
 
   static saveSMBConfig(config: SMBConfig): void {

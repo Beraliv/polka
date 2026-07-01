@@ -1,8 +1,11 @@
 import { createSignal, createEffect, For, Show, onMount, onCleanup, batch } from 'solid-js';
 import { Dynamic } from 'solid-js/web';
 import { useNavigate, useParams } from '@solidjs/router';
-import { store, updateBookTotalPages } from '../store/books.ts';
+import { store, setStore, BookStore } from '../store/books.ts';
 import { loadProgress, loadRemoteProgress, saveProgress } from '../lib/progress.ts';
+import { BookFilesDB } from '../lib/polka-db.ts';
+import { parseEPUB } from '../lib/epub.ts';
+import { parseFB2 } from '../lib/fb2.ts';
 import type { SectionItem, Page, RichParagraph, NoteRef, Note } from '../lib/paginate.ts';
 import type { Progress } from '@polka/shared';
 
@@ -199,7 +202,7 @@ export function ReaderPage() {
     if (!sections?.length) return;
 
     const built = buildPages(contentEl, sections);
-    updateBookTotalPages(bookId, built.length);
+    BookStore.updateTotalPages(bookId, built.length);
     batch(() => {
       setLocalPages(built);
       setPageIdx(Math.round(restorePercent * Math.max(0, built.length - 1)));
@@ -222,34 +225,45 @@ export function ReaderPage() {
   }
 
   onMount(() => {
-    if (!store.sections[bookId]) {
-      navigate('/');
-      return;
-    }
-
     const originalLang = document.documentElement.lang;
-    const bookLang = book()?.lang;
-    if (bookLang) document.documentElement.lang = bookLang;
     onCleanup(() => { document.documentElement.lang = originalLang; });
 
-    const local = loadProgress(bookId);
-    smbPath = local?.smbPath;
-    const savedPercent = local ? local.percent / 100 : 0;
-
-    void loadRemoteProgress(bookId).then((remote) => {
-      if (!remote) return;
-      const localPercent = local?.percent ?? 0;
-      if (remote.percent > localPercent) {
-        const total = localPages().length;
-        if (total > 0) {
-          setPageIdx(Math.round((remote.percent / 100) * Math.max(0, total - 1)));
+    async function init() {
+      if (!store.sections[bookId]) {
+        const file = await BookFilesDB.download(bookId);
+        if (!file) {
+          navigate('/');
+          return;
         }
+        const parsed = file.format === 'epub' ? parseEPUB(file.arrayBuffer) : parseFB2(file.arrayBuffer);
+        setStore('sections', bookId, parsed.sections);
+        if (parsed.notes) setStore('notes', bookId, parsed.notes);
       }
-    });
 
-    requestAnimationFrame(() => {
-      repaginate(savedPercent);
-    });
+      const bookLang = book()?.lang;
+      if (bookLang) document.documentElement.lang = bookLang;
+
+      const local = loadProgress(bookId);
+      smbPath = local?.smbPath;
+      const savedPercent = local ? local.percent / 100 : 0;
+
+      void loadRemoteProgress(bookId).then((remote) => {
+        if (!remote) return;
+        const localPercent = local?.percent ?? 0;
+        if (remote.percent > localPercent) {
+          const total = localPages().length;
+          if (total > 0) {
+            setPageIdx(Math.round((remote.percent / 100) * Math.max(0, total - 1)));
+          }
+        }
+      });
+
+      requestAnimationFrame(() => {
+        repaginate(savedPercent);
+      });
+    }
+
+    void init();
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {

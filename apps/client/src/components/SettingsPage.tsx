@@ -1,6 +1,6 @@
 import { createSignal, Show } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
-import { store, setSMB, clearSMB } from '../store/books.ts';
+import { store, BookStore } from '../store/books.ts';
 import { testSMB } from '../lib/api.ts';
 import type { SMBConfig } from '@polka/shared';
 
@@ -47,12 +47,12 @@ export function SettingsPage() {
     if (!config.password && existing?.password) {
       config.password = existing.password;
     }
-    setSMB(config);
+    BookStore.saveSMBConfig(config);
     navigate('/');
   }
 
   function handleClear() {
-    clearSMB();
+    BookStore.deleteSMBConfig();
     navigate('/');
   }
 

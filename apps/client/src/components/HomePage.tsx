@@ -1,12 +1,13 @@
-import { createSignal, createMemo, For, Show } from 'solid-js';
+import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
 import { A, useNavigate } from '@solidjs/router';
-import { store, addBook, removeBook } from '../store/books.ts';
+import { store, BookStore } from '../store/books.ts';
 import { allProgress } from '../lib/progress.ts';
 import { parseEPUB } from '../lib/epub.ts';
 import { parseFB2 } from '../lib/fb2.ts';
 import { computeBookId } from '../lib/bookId.ts';
 import { downloadSMBFile } from '../lib/api.ts';
 import { loadProgress, saveProgress } from '../lib/progress.ts';
+import { BookFilesDB } from '../lib/polka-db.ts';
 import { BookCard } from './BookCard.tsx';
 import { FileBrowser } from './FileBrowser.tsx';
 import type { Book, BookFormat } from '@polka/shared';
@@ -20,6 +21,19 @@ export function HomePage() {
   const [reopeningId, setReopeningId] = createSignal<string | null>(null);
   const [addError, setAddError] = createSignal('');
   const [showBrowser, setShowBrowser] = createSignal(false);
+  const [idbBookIds, setIdbBookIds] = createSignal(new Set<string>());
+
+  onMount(() => {
+    void (async () => {
+      const available = new Set<string>();
+      await Promise.all(store.books.map(async (b) => {
+        if (await BookFilesDB.has(b.id)) {
+          available.add(b.id);
+        }
+      }));
+      setIdbBookIds(available);
+    })();
+  });
 
   const progressMap = createMemo(() => {
     const map: Record<string, ReturnType<typeof allProgress>[number]> = {};
@@ -48,7 +62,8 @@ export function HomePage() {
       totalPages: 0,
       addedAt: Date.now(),
     };
-    addBook({ book, sections: parsed.sections, notes: parsed.notes });
+    void BookStore.uploadBook({ book, sections: parsed.sections, notes: parsed.notes, arrayBuffer: buffer });
+    setIdbBookIds((prev) => new Set([...prev, bookId]));
     return bookId;
   }
 
@@ -162,11 +177,11 @@ export function HomePage() {
               <BookCard
                 book={book}
                 progress={progressMap()[book.id]}
-                available={!!store.sections[book.id]}
+                available={!!store.sections[book.id] || idbBookIds().has(book.id)}
                 onOpen={() => openBook(book.id)}
                 onReopen={() => void reopenBook(book.id)}
                 loading={reopeningId() === book.id}
-                onRemove={() => removeBook(book.id)}
+                onRemove={() => void BookStore.deleteBook(book.id)}
               />
             )}
           </For>
@@ -181,11 +196,11 @@ export function HomePage() {
               <BookCard
                 book={book}
                 progress={progressMap()[book.id]}
-                available={!!store.sections[book.id]}
+                available={!!store.sections[book.id] || idbBookIds().has(book.id)}
                 onOpen={() => openBook(book.id)}
                 onReopen={() => void reopenBook(book.id)}
                 loading={reopeningId() === book.id}
-                onRemove={() => removeBook(book.id)}
+                onRemove={() => void BookStore.deleteBook(book.id)}
               />
             )}
           </For>

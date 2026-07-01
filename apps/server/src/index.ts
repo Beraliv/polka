@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import staticFiles from '@fastify/static';
+import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { join, dirname } from 'path';
 import { smbRoutes } from './routes/smb.ts';
@@ -14,7 +15,14 @@ process.on('uncaughtException', (err) => {
   console.error('Uncaught exception (SMB/NTLM):', err.message);
 });
 
-const app = Fastify({ logger: { level: 'info' } });
+const tlsKeyFile = process.env.TLS_KEY_FILE;
+const tlsCertFile = process.env.TLS_CERT_FILE;
+const https =
+  tlsKeyFile && tlsCertFile
+    ? { key: readFileSync(tlsKeyFile), cert: readFileSync(tlsCertFile) }
+    : undefined;
+
+const app = Fastify({ logger: { level: 'info' }, https });
 
 const allowedOrigins = process.env.ALLOWED_ORIGIN
   ? process.env.ALLOWED_ORIGIN.split(',').map((s) => s.trim())
@@ -44,4 +52,5 @@ const port = Number(process.env.PORT ?? 3001);
 const host = process.env.HOST ?? '0.0.0.0';
 
 await app.listen({ port, host });
-console.log(`Server listening on http://${host}:${port}`);
+const scheme = https ? 'https' : 'http';
+console.log(`Server listening on ${scheme}://${host}:${port}`);

@@ -3,24 +3,58 @@ import { Dynamic } from 'solid-js/web';
 import { useNavigate, useParams } from '@solidjs/router';
 import { store, updateBookTotalPages } from '../store/books.ts';
 import { loadProgress, loadRemoteProgress, saveProgress } from '../lib/progress.ts';
-import type { SectionItem, Page } from '../lib/paginate.ts';
+import type { SectionItem, Page, RichParagraph, NoteRef, Note } from '../lib/paginate.ts';
 import type { Progress } from '@polka/shared';
 
-function maxFittingWords(
-  container: HTMLElement,
-  words: string[],
-  availH: number,
-): number {
-  const el = document.createElement('p');
-  el.className = 'reader-paragraph';
-  let lo = 0, hi = words.length - 1, count = 0;
-  while (lo <= hi) {
-    const mid = Math.floor((lo + hi) / 2);
-    el.textContent = words.slice(0, mid + 1).join(' ');
-    container.appendChild(el);
+// Internal token for pagination: plain words or atomic note references.
+type Token = { text: string } | NoteRef;
+
+function tokenize(paragraph: RichParagraph): Token[] {
+  const tokens: Token[] = [];
+  for (const span of paragraph) {
+    if (typeof span === 'string') {
+      for (const word of span.split(/\s+/).filter(Boolean)) {
+        tokens.push({ text: word });
+      }
+    } else {
+      tokens.push(span);
+    }
+  }
+  return tokens;
+}
+
+function tokensText(tokens: Token[]): string {
+  return tokens.map((token) => ('text' in token ? token.text : token.label)).join(' ');
+}
+
+function tokensToRich(tokens: Token[]): RichParagraph {
+  const segments: RichParagraph = [];
+  let textBuffer = '';
+  for (const token of tokens) {
+    if ('text' in token) {
+      textBuffer += (textBuffer ? ' ' : '') + token.text;
+    } else {
+      if (textBuffer) { segments.push(textBuffer); textBuffer = ''; }
+      segments.push(token);
+    }
+  }
+  if (textBuffer) segments.push(textBuffer);
+  return segments;
+}
+
+type MaxFittingTokensOptions = { container: HTMLElement; tokens: Token[]; availH: number };
+
+function maxFittingTokens({ container, tokens, availH }: MaxFittingTokensOptions): number {
+  const measureEl = document.createElement('p');
+  measureEl.className = 'reader-paragraph';
+  let low = 0, high = tokens.length - 1, count = 0;
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    measureEl.textContent = tokensText(tokens.slice(0, mid + 1));
+    container.appendChild(measureEl);
     const fits = container.scrollHeight <= availH;
-    container.removeChild(el);
-    if (fits) { count = mid + 1; lo = mid + 1; } else { hi = mid - 1; }
+    container.removeChild(measureEl);
+    if (fits) { count = mid + 1; low = mid + 1; } else { high = mid - 1; }
   }
   return count;
 }
@@ -31,7 +65,7 @@ function buildPages(contentEl: HTMLElement, sections: SectionItem[]): Page[] {
   if (availH <= 0 || availW <= 0 || sections.length === 0) return [];
 
   // Mirror the real content element's computed styles so measurements are accurate
-  const cs = window.getComputedStyle(contentEl);
+  const computedStyle = window.getComputedStyle(contentEl);
   const container = document.createElement('div');
   container.style.cssText = [
     'position:fixed',
@@ -40,10 +74,10 @@ function buildPages(contentEl: HTMLElement, sections: SectionItem[]): Page[] {
     'left:0',
     `width:${availW}px`,
     'box-sizing:border-box',
-    `padding:${cs.paddingTop} ${cs.paddingRight} ${cs.paddingBottom} ${cs.paddingLeft}`,
-    `font-family:${cs.fontFamily}`,
-    `font-size:${cs.fontSize}`,
-    `line-height:${cs.lineHeight}`,
+    `padding:${computedStyle.paddingTop} ${computedStyle.paddingRight} ${computedStyle.paddingBottom} ${computedStyle.paddingLeft}`,
+    `font-family:${computedStyle.fontFamily}`,
+    `font-size:${computedStyle.fontSize}`,
+    `line-height:${computedStyle.lineHeight}`,
     'overflow:visible',
     'height:auto',
   ].join(';');
@@ -63,46 +97,40 @@ function buildPages(contentEl: HTMLElement, sections: SectionItem[]): Page[] {
     if (section.title) {
       const level = Math.min(Math.max(section.level ?? 1, 1), 5);
       current.push({ title: section.title, level });
-      const h = document.createElement(`h${level}`);
-      h.className = 'reader-section-title';
-      h.textContent = section.title;
-      container.appendChild(h);
+      const headingEl = document.createElement(`h${level}`);
+      headingEl.className = 'reader-section-title';
+      headingEl.textContent = section.title;
+      container.appendChild(headingEl);
     }
 
     for (const para of section.paragraphs) {
-      let remaining = para;
+      let remaining: Token[] = tokenize(para);
 
       while (remaining.length > 0) {
-        const el = document.createElement('p');
-        el.className = 'reader-paragraph';
-        el.textContent = remaining;
-        container.appendChild(el);
+        const paragraphEl = document.createElement('p');
+        paragraphEl.className = 'reader-paragraph';
+        paragraphEl.textContent = tokensText(remaining);
+        container.appendChild(paragraphEl);
 
         if (container.scrollHeight <= availH) {
-          // Entire remaining text fits on this page
-          current.push({ content: remaining });
-          remaining = '';
+          current.push({ content: tokensToRich(remaining) });
+          remaining = [];
         } else {
-          // Overflow — try to fit as many words as possible
-          container.removeChild(el);
-          const words = remaining.split(' ');
-          const fitting = maxFittingWords(container, words, availH);
+          container.removeChild(paragraphEl);
+          const fitting = maxFittingTokens({ container, tokens: remaining, availH });
 
           if (fitting > 0) {
-            // Put fitting words on current page, carry the rest forward
-            current.push({ content: words.slice(0, fitting).join(' ') });
-            remaining = words.slice(fitting).join(' ');
+            current.push({ content: tokensToRich(remaining.slice(0, fitting)) });
+            remaining = remaining.slice(fitting);
             flush(current);
             current = [];
           } else if (current.length > 0) {
-            // Nothing fits on the current page — flush it and retry on a fresh page
             flush(current);
             current = [];
           } else {
-            // Empty page and still nothing fits (paragraph larger than a full page)
-            // Include it as-is to avoid an infinite loop
-            current.push({ content: remaining });
-            remaining = '';
+            // Paragraph larger than a full page — include as-is to avoid infinite loop
+            current.push({ content: tokensToRich(remaining) });
+            remaining = [];
             flush(current);
             current = [];
           }
@@ -110,7 +138,6 @@ function buildPages(contentEl: HTMLElement, sections: SectionItem[]): Page[] {
       }
     }
 
-    // Section ends: flush remaining page only if it has content
     if (current.length > 0) {
       pages.push(current);
     }
@@ -133,11 +160,18 @@ export function ReaderPage() {
   const [ready, setReady] = createSignal(false);
   const [seeking, setSeeking] = createSignal(false);
   const [seekValue, setSeekValue] = createSignal('');
+  const [activeNoteId, setActiveNoteId] = createSignal<string | null>(null);
   let smbPath: string | undefined;
   let contentEl: HTMLDivElement | undefined;
   let seekInputEl: HTMLInputElement | undefined;
   let touchStartX = 0;
   let touchStartY = 0;
+
+  const activeNote = (): Note | null => {
+    const id = activeNoteId();
+    if (!id) return null;
+    return store.notes?.[bookId]?.[id] ?? null;
+  };
 
   function openSeek() {
     setSeekValue(String(pageIdx() + 1));
@@ -219,13 +253,16 @@ export function ReaderPage() {
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+        if (activeNoteId()) return;
         e.preventDefault();
         nextPage();
       } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        if (activeNoteId()) return;
         e.preventDefault();
         prevPage();
       } else if (e.key === 'Escape') {
-        if (seeking()) cancelSeek();
+        if (activeNoteId()) setActiveNoteId(null);
+        else if (seeking()) cancelSeek();
         else navigate('/');
       }
     };
@@ -267,6 +304,7 @@ export function ReaderPage() {
   }
 
   function handleContentTouchEnd(e: TouchEvent) {
+    if (activeNoteId()) return;
     const t = e.changedTouches[0];
     if (!t) return;
     if (Math.abs(t.clientX - touchStartX) > 10 || Math.abs(t.clientY - touchStartY) > 10) return;
@@ -342,10 +380,27 @@ export function ReaderPage() {
         <Show when={ready()}>
           <For each={currentPage()}>
             {(item) => (
-              <Show when={item.content} fallback={
+              <Show when={item.content !== undefined} fallback={
                 <Dynamic component={`h${item.level ?? 1}`} class="reader-section-title">{item.title}</Dynamic>
               }>
-                <p class="reader-paragraph">{item.content}</p>
+                <p class="reader-paragraph">
+                  <For each={item.content!}>
+                    {(span) => {
+                      if (typeof span === 'string') return <>{span}</>;
+                      return (
+                        <button
+                          class="footnote-ref"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveNoteId(span.noteId);
+                          }}
+                        >
+                          {span.label}
+                        </button>
+                      );
+                    }}
+                  </For>
+                </p>
               </Show>
             )}
           </For>
@@ -360,6 +415,24 @@ export function ReaderPage() {
           <div class="reader-percent">{percent()}%</div>
         </div>
       </div>
+
+      <Show when={activeNote() !== null}>
+        <div class="note-popup-overlay" onClick={() => setActiveNoteId(null)}>
+          <div class="note-popup" onClick={(e) => e.stopPropagation()}>
+            <div class="note-popup-content">
+              <Show when={activeNote()?.title}>
+                <h2 class="note-popup-title">{activeNote()?.title}</h2>
+              </Show>
+              <p class="note-popup-text">{activeNote()?.text}</p>
+            </div>
+            <button class="note-popup-close" onClick={() => setActiveNoteId(null)} aria-label="Close">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 1L9 9M9 1L1 9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </Show>
     </div>
   );
 }

@@ -1,10 +1,11 @@
-import type { SectionItem } from './paginate.ts';
+import type { SectionItem, RichParagraph, NoteRef, Note } from './paginate.ts';
 
 export type ParsedBook = {
   title: string;
   author?: string;
   lang?: string;
   sections: SectionItem[];
+  notes: Record<string, Note>;
 };
 
 function getTitle(section: Element): string | undefined {
@@ -18,13 +19,41 @@ function getTitle(section: Element): string | undefined {
   return parts.join(' ') || undefined;
 }
 
+function parseParagraphElement(el: Element): RichParagraph {
+  const segments: RichParagraph = [];
+  for (const node of el.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent ?? '';
+      if (text) segments.push(text);
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const child = node as Element;
+      const tag = child.tagName.toLowerCase();
+      if (tag === 'a' && child.getAttribute('type') === 'note') {
+        const href =
+          child.getAttribute('l:href') ??
+          child.getAttribute('xlink:href') ??
+          child.getAttribute('href') ??
+          '';
+        const noteId = href.startsWith('#') ? href.slice(1) : href;
+        const label = child.textContent?.trim() ?? '';
+        if (noteId && label) {
+          segments.push({ noteId, label } satisfies NoteRef);
+        }
+      } else {
+        segments.push(...parseParagraphElement(child));
+      }
+    }
+  }
+  return segments;
+}
+
 // Collect all <p>/<v> descendants of el, skipping <annotation>, <title>, and nested <section> subtrees.
-function collectParagraphs(el: Element, out: string[]): void {
+function collectParagraphs(el: Element, out: RichParagraph[]): void {
   for (const child of el.children) {
     const tag = child.tagName.toLowerCase();
     if (tag === 'p' || tag === 'v') {
-      const text = child.textContent?.trim();
-      if (text) out.push(text);
+      const paragraph = parseParagraphElement(child);
+      if (paragraph.length > 0) out.push(paragraph);
     } else if (tag !== 'annotation' && tag !== 'title' && tag !== 'section') {
       collectParagraphs(child, out);
     }
@@ -32,19 +61,19 @@ function collectParagraphs(el: Element, out: string[]): void {
 }
 
 // Collect <p>/<v> from a section's direct non-title, non-section, non-annotation children.
-function collectDirectParagraphs(section: Element): string[] {
-  const out: string[] = [];
+function collectDirectParagraphs(section: Element): RichParagraph[] {
+  const out: RichParagraph[] = [];
   for (const child of section.children) {
     const tag = child.tagName.toLowerCase();
     if (tag === 'title' || tag === 'section' || tag === 'annotation') continue;
     if (tag === 'p' || tag === 'v') {
-      const text = child.textContent?.trim();
-      if (text) out.push(text);
+      const paragraph = parseParagraphElement(child);
+      if (paragraph.length > 0) out.push(paragraph);
     } else {
       // poem, epigraph, cite, etc. — grab all p/v descendants
       child.querySelectorAll('p, v').forEach((el) => {
-        const text = el.textContent?.trim();
-        if (text) out.push(text);
+        const paragraph = parseParagraphElement(el);
+        if (paragraph.length > 0) out.push(paragraph);
       });
     }
   }
@@ -52,10 +81,12 @@ function collectDirectParagraphs(section: Element): string[] {
 }
 
 function childSections(el: Element): Element[] {
-  return Array.from(el.children).filter((c) => c.tagName.toLowerCase() === 'section');
+  return Array.from(el.children).filter((childEl) => childEl.tagName.toLowerCase() === 'section');
 }
 
-function collectSections(section: Element, level: number, out: SectionItem[]): void {
+type CollectSectionsOptions = { section: Element; level: number; out: SectionItem[] };
+
+function collectSections({ section, level, out }: CollectSectionsOptions): void {
   if (level > 5) {
     return;
   }
@@ -65,8 +96,45 @@ function collectSections(section: Element, level: number, out: SectionItem[]): v
     out.push({ level, title, paragraphs });
   }
   for (const child of childSections(section)) {
-    collectSections(child, level + 1, out);
+    collectSections({ section: child, level: level + 1, out });
   }
+}
+
+function parseNotes(doc: Document): Record<string, Note> {
+  const notes: Record<string, Note> = {};
+  const notesBody = doc.querySelector('FictionBook > body[name="notes"]');
+  if (!notesBody) return notes;
+  notesBody.querySelectorAll('section[id]').forEach((section) => {
+    const id = section.getAttribute('id');
+    if (!id) return;
+
+    const titleEl = section.querySelector(':scope > title');
+    const titleParts: string[] = [];
+    titleEl?.querySelectorAll('p').forEach((paragraphEl) => {
+      const text = paragraphEl.textContent?.trim();
+      if (text) titleParts.push(text);
+    });
+    const title = titleParts.join(' ') || undefined;
+
+    const textParts: string[] = [];
+    for (const child of section.children) {
+      const tag = child.tagName.toLowerCase();
+      if (tag === 'title' || tag === 'section') continue;
+      if (tag === 'p' || tag === 'v') {
+        const text = child.textContent?.trim();
+        if (text) textParts.push(text);
+      } else {
+        child.querySelectorAll('p, v').forEach((paragraphEl) => {
+          const text = paragraphEl.textContent?.trim();
+          if (text) textParts.push(text);
+        });
+      }
+    }
+
+    const text = textParts.join(' ');
+    if (title || text) notes[id] = { title, text };
+  });
+  return notes;
 }
 
 export function parseFB2(buffer: ArrayBuffer): ParsedBook {
@@ -83,6 +151,8 @@ export function parseFB2(buffer: ArrayBuffer): ParsedBook {
 
   const lang = doc.querySelector('title-info > lang')?.textContent?.trim() || undefined;
 
+  const notes = parseNotes(doc);
+
   const sections: SectionItem[] = [];
 
   doc.querySelectorAll('FictionBook > body').forEach((body) => {
@@ -91,16 +161,16 @@ export function parseFB2(buffer: ArrayBuffer): ParsedBook {
     const topSections = childSections(body);
 
     if (topSections.length === 0) {
-      const paragraphs: string[] = [];
+      const paragraphs: RichParagraph[] = [];
       collectParagraphs(body, paragraphs);
       if (paragraphs.length > 0) sections.push({ paragraphs });
       return;
     }
 
     for (const topSection of topSections) {
-      collectSections(topSection, 1, sections);
+      collectSections({ section: topSection, level: 1, out: sections });
     }
   });
 
-  return { title, author, lang, sections };
+  return { title, author, lang, sections, notes };
 }

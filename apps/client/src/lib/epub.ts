@@ -1,11 +1,12 @@
 import { unzipSync } from 'fflate';
-import type { SectionItem } from './paginate.ts';
+import type { SectionItem, RichParagraph, Note } from './paginate.ts';
 
 export type ParsedBook = {
   title: string;
   author?: string;
   lang?: string;
   sections: SectionItem[];
+  notes?: Record<string, Note>;
 };
 
 function decode(bytes: Uint8Array): string {
@@ -19,10 +20,10 @@ function extractSectionItem(html: string): SectionItem {
   const headingEl = doc.querySelector('h1, h2, h3');
   const title = headingEl?.textContent?.trim() || undefined;
 
-  const paragraphs: string[] = [];
+  const paragraphs: RichParagraph[] = [];
   doc.querySelectorAll('p, li').forEach((el) => {
     const text = el.textContent?.trim();
-    if (text) paragraphs.push(text);
+    if (text) paragraphs.push([text]);
   });
 
   return { level: 1, title, paragraphs };

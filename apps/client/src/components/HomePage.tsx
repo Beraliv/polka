@@ -48,7 +48,7 @@ export function HomePage() {
       totalPages: 0,
       addedAt: Date.now(),
     };
-    addBook(book, parsed.sections);
+    addBook({ book, sections: parsed.sections, notes: parsed.notes });
     return bookId;
   }
 

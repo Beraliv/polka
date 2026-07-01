@@ -1,4 +1,6 @@
 import Fastify from 'fastify';
+import type { FastifyInstance } from 'fastify';
+import type { Server as HttpsServer } from 'https';
 import cors from '@fastify/cors';
 import staticFiles from '@fastify/static';
 import { readFileSync } from 'fs';
@@ -17,12 +19,16 @@ process.on('uncaughtException', (err) => {
 
 const tlsKeyFile = process.env.TLS_KEY_FILE;
 const tlsCertFile = process.env.TLS_CERT_FILE;
-const https =
+const tlsOptions =
   tlsKeyFile && tlsCertFile
     ? { key: readFileSync(tlsKeyFile), cert: readFileSync(tlsCertFile) }
     : undefined;
 
-const app = Fastify({ logger: { level: 'info' }, https });
+const app = (
+  tlsOptions
+    ? Fastify<HttpsServer>({ logger: { level: 'info' }, https: tlsOptions })
+    : Fastify({ logger: { level: 'info' } })
+) as FastifyInstance;
 
 const allowedOrigins = process.env.ALLOWED_ORIGIN
   ? process.env.ALLOWED_ORIGIN.split(',').map((s) => s.trim())
@@ -52,5 +58,5 @@ const port = Number(process.env.PORT ?? 3001);
 const host = process.env.HOST ?? '0.0.0.0';
 
 await app.listen({ port, host });
-const scheme = https ? 'https' : 'http';
+const scheme = tlsOptions ? 'https' : 'http';
 console.log(`Server listening on ${scheme}://${host}:${port}`);

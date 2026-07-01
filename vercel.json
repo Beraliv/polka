@@ -1,0 +1,6 @@
+{
+  "buildCommand": "pnpm -C apps/client build",
+  "outputDirectory": "apps/client/dist",
+  "installCommand": "pnpm install",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}

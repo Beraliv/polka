@@ -45,6 +45,23 @@ Progress JSON files are stored in a named Docker volume (`progress_data`) mounte
 2. Paste the contents of `docker-compose.yml`
 3. Add a host-path volume for persistent progress storage if desired
 
+## Install as PWA
+
+### iOS (Safari)
+
+1. Open the app URL in **Safari**
+2. Tap the **Share** button (box with arrow pointing up)
+3. Scroll down and tap **Add to Home Screen**
+4. Confirm the name and tap **Add**
+
+### Android (Chrome)
+
+1. Open the app URL in **Chrome**
+2. Tap the **⋮** menu → **Add to Home screen** (or tap the install prompt in the address bar)
+3. Tap **Add**
+
+The app opens full-screen without browser chrome. Books and progress are stored on-device in IndexedDB and available offline.
+
 ## SMB setup
 
 1. Open the app and go to **Settings (⚙)**

@@ -17,10 +17,19 @@ function createClient(config: SMBConfig) {
   });
 }
 
+const CONNECTION_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
+}
+
 export async function testConnection(config: SMBConfig): Promise<void> {
   const smb = createClient(config);
   try {
-    await smb.readdir('');
+    await withTimeout(smb.readdir('') as Promise<unknown>, CONNECTION_TIMEOUT_MS, 'Connection timed out');
   } finally {
     smb.disconnect();
   }

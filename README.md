@@ -7,10 +7,13 @@ A mobile-first e-book reader for EPUB and FB2 files, designed to run on TrueNAS.
 - Read **EPUB** and **FB2** books
 - **Open local files** directly from your device — no upload needed
 - **Browse your NAS** via SMB and open books remotely
-- **Progress sync** — saves to localStorage and optionally to the server
+- **Books persist across reloads** — stored in IndexedDB, no re-download needed
+- **Progress sync** — saved to IndexedDB and optionally synced to the server
+- **Footnote popups** — tap inline references to read notes without leaving the page
 - **Mobile-first** — swipe left/right to turn pages; keyboard arrows and spacebar also work
 - **Page-based rendering** — only the current page is in the DOM, so even large books stay fast
 - **Dark theme** — easy on the eyes for night reading
+- **Installable as a PWA** — add to home screen; app shell works offline
 - **Installable on TrueNAS SCALE** via Docker Compose
 
 ## Quick start (local dev)
@@ -49,7 +52,7 @@ Progress JSON files are stored in a named Docker volume (`progress_data`) mounte
 3. Tap **Test Connection** to verify, then **Save**
 4. Back on the home screen, tap **Browse NAS** to pick a book
 
-The password is saved to localStorage so the NAS reconnects automatically on reload. If a book becomes unavailable after a reload, tap its card to re-download it from the NAS.
+The password is saved to localStorage so the NAS reconnects automatically on reload. Books downloaded from the NAS are cached in IndexedDB and reopen instantly without re-downloading.
 
 ## Tech stack
 
@@ -60,4 +63,6 @@ The password is saved to localStorage so the NAS reconnects automatically on rel
 | EPUB parsing | fflate + DOMParser |
 | FB2 parsing | DOMParser (FB2 is XML) |
 | SMB | @marsaud/smb2 |
+| Persistence | IndexedDB (idb) |
+| PWA | vite-plugin-pwa + Workbox |
 | Container | Docker + nginx |

@@ -1,0 +1,21 @@
+# Code guidelines
+
+## Philosophy
+
+- **Descriptive names > brevity** — a name that explains what something is or does is always better than a short one. Avoid abbreviations and single-letter variables outside of trivial loop counters.
+- **Correctness > cleverness** — prefer straightforward, readable code over compact or "clever" solutions. If a reader has to pause to understand it, rewrite it.
+
+## Functions
+
+- **Maximum 2 parameters.** If a function needs more than 2 inputs, group them into a named options object instead.
+
+  ```ts
+  // bad
+  function buildPages(contentEl, sections, availableHeight, availableWidth) { ... }
+
+  // good
+  function buildPages({ contentEl, sections, availableHeight, availableWidth }: BuildPagesOptions) { ... }
+  ```
+
+- This rule applies to all function types: plain functions, arrow functions, methods, and callbacks.
+- Exception: a well-known positional pair (e.g. `(error, result)` in a Node callback) is acceptable where it matches an established convention, but prefer the options-object style when in doubt.

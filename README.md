@@ -42,9 +42,7 @@ Progress JSON files are stored in a named Docker volume (`progress_data`) mounte
 
 ### TrueNAS SCALE
 
-1. Go to **Apps → Custom App**
-2. Paste the contents of `docker-compose.yml`
-3. Add a host-path volume for persistent progress storage if desired
+Polka installs as a two-container custom app via **Install via YAML** (the single-container Custom App form doesn't fit). Build and push the two images to a registry, then paste an adapted compose config — full steps in the **[TrueNAS install guide](docs/truenas-install.md)**.
 
 ## Install as PWA
 

@@ -62,13 +62,13 @@ function maxFittingTokens({ container, tokens, availH }: MaxFittingTokensOptions
   return count;
 }
 
-function buildPages(contentEl: HTMLElement, sections: SectionItem[]): Page[] {
-  const availH = contentEl.clientHeight;
-  const availW = contentEl.clientWidth;
+function buildPages(pageEl: HTMLElement, sections: SectionItem[]): Page[] {
+  const availH = pageEl.clientHeight;
+  const availW = pageEl.clientWidth;
   if (availH <= 0 || availW <= 0 || sections.length === 0) return [];
 
-  // Mirror the real content element's computed styles so measurements are accurate
-  const computedStyle = window.getComputedStyle(contentEl);
+  // Mirror the real page element's computed styles so measurements are accurate
+  const computedStyle = window.getComputedStyle(pageEl);
   const container = document.createElement('div');
   container.style.cssText = [
     'position:fixed',
@@ -151,6 +151,39 @@ function buildPages(contentEl: HTMLElement, sections: SectionItem[]): Page[] {
   return pages;
 }
 
+type PageContentProps = { items: Page; onNoteClick: (noteId: string) => void };
+
+function PageContent(props: PageContentProps) {
+  return (
+    <For each={props.items}>
+      {(item) => (
+        <Show when={item.content !== undefined} fallback={
+          <Dynamic component={`h${item.level ?? 1}`} class="reader-section-title">{item.title}</Dynamic>
+        }>
+          <p class="reader-paragraph">
+            <For each={item.content!}>
+              {(span) => {
+                if (typeof span === 'string') return <>{span}</>;
+                return (
+                  <button
+                    class="footnote-ref"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      props.onNoteClick(span.noteId);
+                    }}
+                  >
+                    {span.label}
+                  </button>
+                );
+              }}
+            </For>
+          </p>
+        </Show>
+      )}
+    </For>
+  );
+}
+
 export function ReaderPage() {
   const params = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -158,6 +191,8 @@ export function ReaderPage() {
 
   const book = () => store.books.find((b) => b.id === bookId);
 
+  const desktopMediaQuery = window.matchMedia('(min-width: 900px)');
+  const [isTwoPageView, setIsTwoPageView] = createSignal(desktopMediaQuery.matches);
   const [pageIdx, setPageIdx] = createSignal(0);
   const [localPages, setLocalPages] = createSignal<Page[]>([]);
   const [ready, setReady] = createSignal(false);
@@ -166,9 +201,19 @@ export function ReaderPage() {
   const [activeNoteId, setActiveNoteId] = createSignal<string | null>(null);
   let smbPath: string | undefined;
   let contentEl: HTMLDivElement | undefined;
+  let pageEl: HTMLDivElement | undefined;
   let seekInputEl: HTMLInputElement | undefined;
   let touchStartX = 0;
   let touchStartY = 0;
+
+  const pageStep = () => (isTwoPageView() ? 2 : 1);
+
+  // In two-page view, spreads always start on an even index so page pairs stay stable.
+  function clampPageIndex(index: number, totalPages: number): number {
+    const maxIndex = Math.max(0, totalPages - 1);
+    const clamped = Math.min(Math.max(index, 0), maxIndex);
+    return isTwoPageView() ? clamped - (clamped % 2) : clamped;
+  }
 
   const activeNote = (): Note | null => {
     const id = activeNoteId();
@@ -186,7 +231,7 @@ export function ReaderPage() {
     if (!seeking()) return;
     const n = parseInt(seekValue(), 10);
     if (!isNaN(n)) {
-      setPageIdx(Math.min(Math.max(n - 1, 0), total() - 1));
+      setPageIdx(clampPageIndex(n - 1, total()));
       scrollToTop();
     }
     setSeeking(false);
@@ -197,26 +242,27 @@ export function ReaderPage() {
   }
 
   function repaginate(restorePercent: number) {
-    if (!contentEl) return;
+    if (!pageEl) return;
     const sections = store.sections[bookId];
     if (!sections?.length) return;
 
-    const built = buildPages(contentEl, sections);
+    const built = buildPages(pageEl, sections);
     BookStore.updateTotalPages(bookId, built.length);
     batch(() => {
       setLocalPages(built);
-      setPageIdx(Math.round(restorePercent * Math.max(0, built.length - 1)));
+      const restoredIndex = Math.round(restorePercent * Math.max(0, built.length - 1));
+      setPageIdx(clampPageIndex(restoredIndex, built.length));
       setReady(true);
     });
   }
 
   function nextPage() {
-    setPageIdx((i) => Math.min(i + 1, localPages().length - 1));
+    setPageIdx((current) => clampPageIndex(current + pageStep(), localPages().length));
     scrollToTop();
   }
 
   function prevPage() {
-    setPageIdx((i) => Math.max(i - 1, 0));
+    setPageIdx((current) => clampPageIndex(current - pageStep(), localPages().length));
     scrollToTop();
   }
 
@@ -253,7 +299,8 @@ export function ReaderPage() {
         if (remote.percent > localPercent) {
           const total = localPages().length;
           if (total > 0) {
-            setPageIdx(Math.round((remote.percent / 100) * Math.max(0, total - 1)));
+            const remoteIndex = Math.round((remote.percent / 100) * Math.max(0, total - 1));
+            setPageIdx(clampPageIndex(remoteIndex, total));
           }
         }
       });
@@ -291,6 +338,13 @@ export function ReaderPage() {
     };
     window.addEventListener('resize', handleResize);
     onCleanup(() => window.removeEventListener('resize', handleResize));
+
+    // Repagination itself is driven by the resize handler above; this only flips the layout mode.
+    const handleDesktopMediaChange = (event: MediaQueryListEvent) => {
+      setIsTwoPageView(event.matches);
+    };
+    desktopMediaQuery.addEventListener('change', handleDesktopMediaChange);
+    onCleanup(() => desktopMediaQuery.removeEventListener('change', handleDesktopMediaChange));
   });
 
   createEffect(() => {
@@ -299,14 +353,15 @@ export function ReaderPage() {
     const b = book();
     const total = localPages().length;
     if (!b || total === 0) return;
+    const lastVisiblePage = Math.min(idx + pageStep(), total);
     const progress: Progress = {
       bookId,
       bookName: b.name,
       currentPage: idx + 1,
       totalPages: total,
-      percent: Math.round(((idx + 1) / total) * 100),
+      percent: Math.round((lastVisiblePage / total) * 100),
       lastRead: Date.now(),
-      finished: idx + 1 >= total,
+      finished: lastVisiblePage >= total,
       smbPath,
     };
     saveProgress(progress);
@@ -329,8 +384,15 @@ export function ReaderPage() {
   }
 
   const currentPage = () => localPages()[pageIdx()] ?? [];
+  const secondPage = () => localPages()[pageIdx() + 1] ?? [];
   const total = () => localPages().length;
-  const percent = () => (total() > 0 ? Math.round(((pageIdx() + 1) / total()) * 100) : 0);
+  const lastVisiblePageNumber = () => Math.min(pageIdx() + pageStep(), total());
+  const percent = () => (total() > 0 ? Math.round((lastVisiblePageNumber() / total()) * 100) : 0);
+  const pageRangeLabel = () => {
+    const firstPageNumber = pageIdx() + 1;
+    const lastPageNumber = lastVisiblePageNumber();
+    return lastPageNumber > firstPageNumber ? `${firstPageNumber}-${lastPageNumber}` : `${firstPageNumber}`;
+  };
 
   return (
     <div class="reader">
@@ -339,7 +401,7 @@ export function ReaderPage() {
         <span class="reader-book-title">{book()?.name ?? ''}</span>
         <Show when={seeking()} fallback={
           <span class="reader-page-info" onClick={openSeek} title="Go to page">
-            {pageIdx() + 1} / {total()}
+            {pageRangeLabel()} / {total()}
           </span>
         }>
           <input
@@ -380,7 +442,7 @@ export function ReaderPage() {
         <button
           class="reader-nav-overlay reader-nav-overlay--next"
           onClick={nextPage}
-          disabled={pageIdx() >= total() - 1}
+          disabled={lastVisiblePageNumber() >= total()}
           title="Next page"
           aria-label="Next page"
         >
@@ -391,34 +453,20 @@ export function ReaderPage() {
         <Show when={!ready()}>
           <div class="reader-loading"><span class="spinner" /></div>
         </Show>
-        <Show when={ready()}>
-          <For each={currentPage()}>
-            {(item) => (
-              <Show when={item.content !== undefined} fallback={
-                <Dynamic component={`h${item.level ?? 1}`} class="reader-section-title">{item.title}</Dynamic>
-              }>
-                <p class="reader-paragraph">
-                  <For each={item.content!}>
-                    {(span) => {
-                      if (typeof span === 'string') return <>{span}</>;
-                      return (
-                        <button
-                          class="footnote-ref"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveNoteId(span.noteId);
-                          }}
-                        >
-                          {span.label}
-                        </button>
-                      );
-                    }}
-                  </For>
-                </p>
+        <div class="reader-pages">
+          <div class="reader-page" ref={pageEl}>
+            <Show when={ready()}>
+              <PageContent items={currentPage()} onNoteClick={setActiveNoteId} />
+            </Show>
+          </div>
+          <Show when={isTwoPageView()}>
+            <div class="reader-page">
+              <Show when={ready()}>
+                <PageContent items={secondPage()} onNoteClick={setActiveNoteId} />
               </Show>
-            )}
-          </For>
-        </Show>
+            </div>
+          </Show>
+        </div>
       </div>
 
       <div class="reader-footer">

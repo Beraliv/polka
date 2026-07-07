@@ -71,7 +71,7 @@ Differences from the repo's `docker-compose.yml`, and why:
 
 ## Updating
 
-Rebuild and push the images (with `--platform linux/amd64`), then hit **Update** on the app in **Apps → Installed** (or stop/start it) to pull the new `:latest`.
+New images are published to Docker Hub automatically by CI whenever an app's version is bumped on `main`. To update, hit **Update** on the app in **Apps → Installed** (or stop/start it) to pull the new `:latest`.
 
 ## Known limitations
 

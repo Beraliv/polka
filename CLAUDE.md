@@ -19,3 +19,7 @@
 
 - This rule applies to all function types: plain functions, arrow functions, methods, and callbacks.
 - Exception: a well-known positional pair (e.g. `(error, result)` in a Node callback) is acceptable where it matches an established convention, but prefer the options-object style when in doubt.
+
+## Versioning
+
+- **Every commit that changes `apps/client` or `apps/server` must bump the `version` field in that app's `package.json`** (patch for fixes, minor for features), in the same commit. A change to `packages/shared` counts as a change to both apps.

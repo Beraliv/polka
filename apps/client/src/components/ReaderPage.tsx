@@ -151,6 +151,15 @@ function buildPages(pageEl: HTMLElement, sections: SectionItem[]): Page[] {
   return pages;
 }
 
+/**
+ * Returns the progress as a fraction between 0 and 1 based on the current page
+ * and total pages.
+ */
+function progressFraction(progress: Progress | null): number {
+  if (!progress || progress.totalPages <= 1) return 0;
+  return (progress.currentPage - 1) / (progress.totalPages - 1);
+}
+
 type PageContentProps = { items: Page; onNoteClick: (noteId: string) => void };
 
 function PageContent(props: PageContentProps) {
@@ -241,7 +250,7 @@ export function ReaderPage() {
     setSeeking(false);
   }
 
-  function repaginate(restorePercent: number) {
+  function repaginate(restoreFraction: number) {
     if (!pageEl) return;
     const sections = store.sections[bookId];
     if (!sections?.length) return;
@@ -250,7 +259,7 @@ export function ReaderPage() {
     BookStore.updateTotalPages(bookId, built.length);
     batch(() => {
       setLocalPages(built);
-      const restoredIndex = Math.round(restorePercent * Math.max(0, built.length - 1));
+      const restoredIndex = Math.round(restoreFraction * Math.max(0, built.length - 1));
       setPageIdx(clampPageIndex(restoredIndex, built.length));
       setReady(true);
     });
@@ -291,22 +300,22 @@ export function ReaderPage() {
 
       const local = loadProgress(bookId);
       smbPath = local?.smbPath;
-      const savedPercent = local ? local.percent / 100 : 0;
+      const localFraction = progressFraction(local);
 
       void loadRemoteProgress(bookId).then((remote) => {
         if (!remote) return;
-        const localPercent = local?.percent ?? 0;
-        if (remote.percent > localPercent) {
+        const remoteFraction = progressFraction(remote);
+        if (remoteFraction > progressFraction(loadProgress(bookId))) {
           const total = localPages().length;
           if (total > 0) {
-            const remoteIndex = Math.round((remote.percent / 100) * Math.max(0, total - 1));
+            const remoteIndex = Math.round(remoteFraction * Math.max(0, total - 1));
             setPageIdx(clampPageIndex(remoteIndex, total));
           }
         }
       });
 
       requestAnimationFrame(() => {
-        repaginate(savedPercent);
+        repaginate(localFraction);
       });
     }
 
@@ -331,10 +340,10 @@ export function ReaderPage() {
     onCleanup(() => document.removeEventListener('keydown', handleKey));
 
     const handleResize = () => {
-      const currentPercent =
+      const currentFraction =
         localPages().length > 1 ? pageIdx() / (localPages().length - 1) : 0;
       batch(() => setReady(false));
-      requestAnimationFrame(() => repaginate(currentPercent));
+      requestAnimationFrame(() => repaginate(currentFraction));
     };
     window.addEventListener('resize', handleResize);
     onCleanup(() => window.removeEventListener('resize', handleResize));

@@ -6,7 +6,7 @@ export type SectionItem =
   | { level?: number; title?: string; paragraphs: RichParagraph[] }
 
 export type PageItem =
-  | { title?: never; level?: never; content: RichParagraph }
-  | { title: string; level: number; content?: never };
+  | { title?: never; level?: never; content: RichParagraph; noIndent: boolean }
+  | { title: string; level: number; content?: never; noIndent?: never };
 
 export type Page = PageItem[];

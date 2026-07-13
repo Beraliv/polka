@@ -45,17 +45,22 @@ function tokensToRich(tokens: Token[]): RichParagraph {
   return segments;
 }
 
-type MaxFittingTokensOptions = { container: HTMLElement; tokens: Token[]; availH: number };
+type MaxFittingTokensOptions = {
+  container: HTMLElement;
+  tokens: Token[];
+  availableHeight: number;
+  noIndent: boolean;
+};
 
-function maxFittingTokens({ container, tokens, availH }: MaxFittingTokensOptions): number {
+function maxFittingTokens({ container, tokens, availableHeight, noIndent }: MaxFittingTokensOptions): number {
   const measureEl = document.createElement('p');
-  measureEl.className = 'reader-paragraph';
+  measureEl.className = noIndent ? 'reader-paragraph no-indent' : 'reader-paragraph';
   let low = 0, high = tokens.length - 1, count = 0;
   while (low <= high) {
     const mid = Math.floor((low + high) / 2);
     measureEl.textContent = tokensText(tokens.slice(0, mid + 1));
     container.appendChild(measureEl);
-    const fits = container.scrollHeight <= availH;
+    const fits = container.scrollHeight <= availableHeight;
     container.removeChild(measureEl);
     if (fits) { count = mid + 1; low = mid + 1; } else { high = mid - 1; }
   }
@@ -63,9 +68,9 @@ function maxFittingTokens({ container, tokens, availH }: MaxFittingTokensOptions
 }
 
 function buildPages(pageEl: HTMLElement, sections: SectionItem[]): Page[] {
-  const availH = pageEl.clientHeight;
-  const availW = pageEl.clientWidth;
-  if (availH <= 0 || availW <= 0 || sections.length === 0) return [];
+  const availableHeight = pageEl.clientHeight;
+  const availableWidth = pageEl.clientWidth;
+  if (availableHeight <= 0 || availableWidth <= 0 || sections.length === 0) return [];
 
   // Mirror the real page element's computed styles so measurements are accurate
   const computedStyle = window.getComputedStyle(pageEl);
@@ -75,7 +80,7 @@ function buildPages(pageEl: HTMLElement, sections: SectionItem[]): Page[] {
     'visibility:hidden',
     'top:-9999px',
     'left:0',
-    `width:${availW}px`,
+    `width:${availableWidth}px`,
     'box-sizing:border-box',
     `padding:${computedStyle.paddingTop} ${computedStyle.paddingRight} ${computedStyle.paddingBottom} ${computedStyle.paddingLeft}`,
     `font-family:${computedStyle.fontFamily}`,
@@ -108,23 +113,32 @@ function buildPages(pageEl: HTMLElement, sections: SectionItem[]): Page[] {
 
     for (const para of section.paragraphs) {
       let remaining: Token[] = tokenize(para);
+      // The tail of a paragraph split across a page boundary continues the
+      // same paragraph, so it must render without the first-line indent.
+      let isContinuation = false;
 
       while (remaining.length > 0) {
         const paragraphEl = document.createElement('p');
-        paragraphEl.className = 'reader-paragraph';
+        paragraphEl.className = isContinuation ? 'reader-paragraph no-indent' : 'reader-paragraph';
         paragraphEl.textContent = tokensText(remaining);
         container.appendChild(paragraphEl);
 
-        if (container.scrollHeight <= availH) {
-          current.push({ content: tokensToRich(remaining) });
+        if (container.scrollHeight <= availableHeight) {
+          current.push({ content: tokensToRich(remaining), noIndent: isContinuation });
           remaining = [];
         } else {
           container.removeChild(paragraphEl);
-          const fitting = maxFittingTokens({ container, tokens: remaining, availH });
+          const fitting = maxFittingTokens({
+            container,
+            tokens: remaining,
+            availableHeight,
+            noIndent: isContinuation,
+          });
 
           if (fitting > 0) {
-            current.push({ content: tokensToRich(remaining.slice(0, fitting)) });
+            current.push({ content: tokensToRich(remaining.slice(0, fitting)), noIndent: isContinuation });
             remaining = remaining.slice(fitting);
+            isContinuation = true;
             flush(current);
             current = [];
           } else if (current.length > 0) {
@@ -132,7 +146,7 @@ function buildPages(pageEl: HTMLElement, sections: SectionItem[]): Page[] {
             current = [];
           } else {
             // Paragraph larger than a full page — include as-is to avoid infinite loop
-            current.push({ content: tokensToRich(remaining) });
+            current.push({ content: tokensToRich(remaining), noIndent: isContinuation });
             remaining = [];
             flush(current);
             current = [];
@@ -169,7 +183,7 @@ function PageContent(props: PageContentProps) {
         <Show when={item.content !== undefined} fallback={
           <Dynamic component={`h${item.level ?? 1}`} class="reader-section-title">{item.title}</Dynamic>
         }>
-          <p class="reader-paragraph">
+          <p class="reader-paragraph" classList={{ 'no-indent': item.noIndent }}>
             <For each={item.content!}>
               {(span) => {
                 if (typeof span === 'string') return <>{span}</>;

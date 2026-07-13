@@ -27,6 +27,17 @@ export async function listSMBFiles(config: SMBConfig, path = ''): Promise<FileEn
   return res.json() as Promise<FileEntry[]>;
 }
 
+export async function fetchServerVersion(): Promise<string | null> {
+  try {
+    const res = await fetch(apiUrl('/api/version'));
+    if (!res.ok) return null;
+    const { version } = await res.json() as { version: string };
+    return version;
+  } catch {
+    return null;
+  }
+}
+
 export async function downloadSMBFile(config: SMBConfig, path: string): Promise<ArrayBuffer> {
   const res = await fetch(apiUrl('/api/smb/file'), {
     method: 'POST',

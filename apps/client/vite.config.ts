@@ -1,8 +1,12 @@
 import { defineConfig } from 'vite';
 import solid from 'vite-plugin-solid';
 import { VitePWA } from 'vite-plugin-pwa';
+import packageJson from './package.json';
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(packageJson.version),
+  },
   plugins: [
     solid(),
     VitePWA({

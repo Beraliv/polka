@@ -53,9 +53,29 @@ Differences from the repo's `docker-compose.yml`, and why:
 
 - Add a book with **Browse files**, or configure SMB browsing under **Settings (⚙)** — use the NAS's real IP, port 445, and your share credentials, then **Test Connection** and **Save**.
 
+## App icon
+
+TrueNAS shows a generic cube icon for custom apps. To use the Polka icon, add an `icon` line to the app's metadata file from the TrueNAS shell:
+
+```bash
+sudo nano /mnt/.ix-apps/app_configs/polka/metadata.yaml
+```
+
+Add this line inside the `metadata:` block (aligned with the other keys, e.g. right after `host_mounts: []`):
+
+```yaml
+  "icon": "https://raw.githubusercontent.com/Beraliv/polka/refs/heads/main/apps/client/public/icon.svg"
+```
+
+To save a file you're editing, press "Ctrl + O" and then "Enter". When you're finished, exit the file by pressing "Ctrl + X".
+
+Then in the UI open **Apps → Installed → polka → Edit** (on the Application Info widget) and click **Save** without changing anything — this reloads the metadata and the icon appears.
+
 ## Updating
 
 New images are published to Docker Hub automatically by CI whenever an app's version is bumped on `main`. To update, hit **Update** on the app in **Apps → Restart App** to pull the new `:latest`.
+
+The Update dialog always shows **1.0.0 / custom** with no versions to pick — that is expected for YAML custom apps, which have no catalog behind them, and it does not reflect Polka's real version. To see which version is actually running, open Polka's **Settings (⚙)** page — the footer shows the client and server versions — or run `curl http://<nas-ip>:8080/api/version`.
 
 ## Debugging
 

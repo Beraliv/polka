@@ -1,12 +1,17 @@
-import { createSignal, Show } from 'solid-js';
+import { createSignal, onMount, Show } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { store, BookStore } from '../store/books.ts';
-import { testSMB } from '../lib/api.ts';
+import { testSMB, fetchServerVersion } from '../lib/api.ts';
 import type { SMBConfig } from '@polka/shared';
 
 export function SettingsPage() {
   const navigate = useNavigate();
   const existing = store.smb;
+
+  const [serverVersion, setServerVersion] = createSignal<string | null>(null);
+  onMount(() => {
+    void fetchServerVersion().then(setServerVersion);
+  });
 
   const [serverUrl, setServerUrl] = createSignal(store.serverUrl ?? '');
   const [ip, setIp] = createSignal(existing?.ip ?? '');
@@ -148,6 +153,11 @@ export function SettingsPage() {
             <button class="btn-danger" onClick={handleClear}>Disconnect NAS</button>
           </Show>
         </div>
+
+        <p class="app-version">
+          Polka client v{__APP_VERSION__}
+          {serverVersion() ? ` · server v${serverVersion()}` : ''}
+        </p>
       </div>
     </div>
   );

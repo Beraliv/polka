@@ -1,6 +1,7 @@
 import type { Progress } from '@polka/shared';
 import { ProgressDB } from './polka-db.ts';
 import { store } from '../store/books.ts';
+import { throttle } from './throttle.ts';
 
 const progressCache: Record<string, Progress> = {};
 
@@ -49,7 +50,9 @@ export function allProgress(): Progress[] {
   return Object.values(progressCache);
 }
 
-function syncRemote(progress: Progress): void {
+const SYNC_INTERVAL_MS = 10_000;
+
+const syncRemote = throttle((progress: Progress) => {
   fetch(`${store.serverUrl}/api/progress`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -57,7 +60,7 @@ function syncRemote(progress: Progress): void {
   }).catch(() => {
     // Remote sync is best-effort; failure is silent
   });
-}
+}, SYNC_INTERVAL_MS);
 
 export async function loadRemoteProgress(bookId: string): Promise<Progress | null> {
   try {

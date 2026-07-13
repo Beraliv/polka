@@ -19,13 +19,14 @@ A mobile-first e-book reader for EPUB and FB2 files, designed to run on TrueNAS.
 
 ## Quick start (local dev)
 
-**Prerequisites:** Node 24, pnpm 11
-
 ```bash
 git clone https://github.com/Beraliv/polka
 cd polka
+nvm install                         # installs recommended node version (unless it's already installed)
+nvm use                             # chooses recommended node version
+kill $(lsof -ti :3000 -ti :3001)    # stop previous runs
 pnpm install
-pnpm dev        # client → http://localhost:3000  server → http://localhost:3001
+pnpm dev                            # client → http://localhost:3000  server → http://localhost:3001
 ```
 
 Open `http://localhost:3000`, tap **+** to open a local `.epub` or `.fb2` file.

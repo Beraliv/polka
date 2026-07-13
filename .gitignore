@@ -4,5 +4,5 @@ dist
 .env.local
 *.local
 coverage
-data/progress/*
 .vercel
+apps/server/data/progress/

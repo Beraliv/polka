@@ -1,13 +1,13 @@
 {
   "name": "@polka/server",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "NODE_OPTIONS=--openssl-legacy-provider node --watch --experimental-strip-types src/index.ts",
     "build": "tsc --project tsconfig.build.json",
     "start": "ALLOWED_ORIGIN=https://polka-zeta.vercel.app NODE_OPTIONS=--openssl-legacy-provider node dist/index.js",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",

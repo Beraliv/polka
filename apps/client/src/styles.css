@@ -455,6 +455,12 @@ h5.reader-section-title { font-size: 0.9rem; }
   height: 1.2em;
 }
 
+/* Book illustration; its height is computed during pagination and set inline */
+.reader-image {
+  display: block;
+  margin: 0.6em auto;
+}
+
 @media (min-width: 900px) {
   .reader-content {
     padding: 32px 64px;

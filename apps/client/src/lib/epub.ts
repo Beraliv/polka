@@ -7,6 +7,7 @@ export type ParsedBook = {
   lang?: string;
   sections: SectionItem[];
   notes?: Record<string, Note>;
+  images?: Record<string, string>;
 };
 
 function decode(bytes: Uint8Array): string {

@@ -62,7 +62,13 @@ export function HomePage() {
       totalPages: 0,
       addedAt: Date.now(),
     };
-    void BookStore.uploadBook({ book, sections: parsed.sections, notes: parsed.notes, arrayBuffer: buffer });
+    void BookStore.uploadBook({
+      book,
+      sections: parsed.sections,
+      notes: parsed.notes,
+      images: parsed.images,
+      arrayBuffer: buffer,
+    });
     setIdbBookIds((prev) => new Set([...prev, bookId]));
     return bookId;
   }

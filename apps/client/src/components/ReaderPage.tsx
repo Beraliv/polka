@@ -6,8 +6,9 @@ import { loadProgress, loadRemoteProgress, saveProgress } from '../lib/progress.
 import { BookFilesDB } from '../lib/polka-db.ts';
 import { parseEPUB } from '../lib/epub.ts';
 import { parseFB2 } from '../lib/fb2.ts';
-import { isEmptyLine, ParagraphType } from '../lib/paginate.ts';
-import type { SectionItem, Page, RichParagraph, NoteRef, Note } from '../lib/paginate.ts';
+import { isEmptyLine, isImage, ParagraphType } from '../lib/paginate.ts';
+import type { SectionItem, Page, RichParagraph, NoteRef, Note, BookImageAsset } from '../lib/paginate.ts';
+import { decodeImageAssets } from '../lib/images.ts';
 import type { Progress } from '@polka/shared';
 
 // Internal token for pagination: plain words or atomic note references.
@@ -68,7 +69,18 @@ function maxFittingTokens({ container, tokens, availableHeight, noIndent }: MaxF
   return count;
 }
 
-function buildPages(pageEl: HTMLElement, sections: SectionItem[]): Page[] {
+// Illustrations are capped to a fraction of the page's content box so the
+// surrounding text keeps enough room for context.
+const MAX_IMAGE_WIDTH_FRACTION = 0.8;
+const MAX_IMAGE_HEIGHT_FRACTION = 0.6;
+
+type BuildPagesOptions = {
+  pageEl: HTMLElement;
+  sections: SectionItem[];
+  imageAssets: Record<string, BookImageAsset>;
+};
+
+function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Page[] {
   const availableHeight = pageEl.clientHeight;
   const availableWidth = pageEl.clientWidth;
   if (availableHeight <= 0 || availableWidth <= 0 || sections.length === 0) return [];
@@ -92,6 +104,13 @@ function buildPages(pageEl: HTMLElement, sections: SectionItem[]): Page[] {
   ].join(';');
   document.body.appendChild(container);
 
+  // clientWidth/clientHeight include padding, so subtract it to get the space
+  // actually available to content such as images.
+  const contentWidth =
+    availableWidth - parseFloat(computedStyle.paddingLeft) - parseFloat(computedStyle.paddingRight);
+  const contentHeight =
+    availableHeight - parseFloat(computedStyle.paddingTop) - parseFloat(computedStyle.paddingBottom);
+
   const pages: Page[] = [];
 
   const flush = (current: Page) => {
@@ -113,6 +132,30 @@ function buildPages(pageEl: HTMLElement, sections: SectionItem[]): Page[] {
     }
 
     for (const paragraph of section.paragraphs) {
+      if (isImage(paragraph)) {
+        const asset = imageAssets[paragraph.imageId];
+        if (!asset) continue;
+        // Scale down to the maximum display size, preserving the aspect ratio.
+        const scale = Math.min(
+          1,
+          (contentWidth * MAX_IMAGE_WIDTH_FRACTION) / asset.width,
+          (contentHeight * MAX_IMAGE_HEIGHT_FRACTION) / asset.height,
+        );
+        const imageHeight = Math.floor(asset.height * scale);
+        const imagePlaceholderEl = document.createElement('div');
+        imagePlaceholderEl.className = 'reader-image';
+        imagePlaceholderEl.style.height = `${imageHeight}px`;
+        container.appendChild(imagePlaceholderEl);
+        if (container.scrollHeight > availableHeight && current.length > 0) {
+          container.removeChild(imagePlaceholderEl);
+          flush(current);
+          current = [];
+          container.appendChild(imagePlaceholderEl);
+        }
+        current.push({ type: ParagraphType.Image, imageId: paragraph.imageId, imageHeight });
+        continue;
+      }
+
       if (isEmptyLine(paragraph)) {
         // An empty line at the top of a page carries no meaning — drop it.
         if (current.length === 0) continue;
@@ -191,7 +234,11 @@ function progressFraction(progress: Progress | null): number {
   return (progress.currentPage - 1) / (progress.totalPages - 1);
 }
 
-type PageContentProps = { items: Page; onNoteClick: (noteId: string) => void };
+type PageContentProps = {
+  items: Page;
+  imageAssets: Record<string, BookImageAsset>;
+  onNoteClick: (noteId: string) => void;
+};
 
 function PageContent(props: PageContentProps) {
   return (
@@ -202,6 +249,14 @@ function PageContent(props: PageContentProps) {
         }>
           <Match when={item.type === ParagraphType.EmptyLine}>
             <div class="reader-empty-line" />
+          </Match>
+          <Match when={item.type === ParagraphType.Image}>
+            <img
+              class="reader-image"
+              src={props.imageAssets[item.imageId!]?.dataUrl}
+              style={{ height: `${item.imageHeight}px` }}
+              alt=""
+            />
           </Match>
           <Match when={item.content !== undefined}>
             <p class="reader-paragraph" classList={{ 'no-indent': item.noIndent }}>
@@ -244,6 +299,7 @@ export function ReaderPage() {
   const [seeking, setSeeking] = createSignal(false);
   const [seekValue, setSeekValue] = createSignal('');
   const [activeNoteId, setActiveNoteId] = createSignal<string | null>(null);
+  const [imageAssets, setImageAssets] = createSignal<Record<string, BookImageAsset>>({});
   let smbPath: string | undefined;
   let contentEl: HTMLDivElement | undefined;
   let pageEl: HTMLDivElement | undefined;
@@ -291,7 +347,7 @@ export function ReaderPage() {
     const sections = store.sections[bookId];
     if (!sections?.length) return;
 
-    const built = buildPages(pageEl, sections);
+    const built = buildPages({ pageEl, sections, imageAssets: imageAssets() });
     BookStore.updateTotalPages(bookId, built.length);
     batch(() => {
       setLocalPages(built);
@@ -329,7 +385,11 @@ export function ReaderPage() {
         const parsed = file.format === 'epub' ? parseEPUB(file.arrayBuffer) : parseFB2(file.arrayBuffer);
         setStore('sections', bookId, parsed.sections);
         if (parsed.notes) setStore('notes', bookId, parsed.notes);
+        setStore('images', bookId, parsed.images ?? {});
       }
+
+      // Decode image sizes before the first pagination so image heights are known.
+      setImageAssets(await decodeImageAssets(store.images[bookId] ?? {}));
 
       const bookLang = book()?.lang;
       if (bookLang) document.documentElement.lang = bookLang;
@@ -501,13 +561,13 @@ export function ReaderPage() {
         <div class="reader-pages">
           <div class="reader-page" ref={pageEl}>
             <Show when={ready()}>
-              <PageContent items={currentPage()} onNoteClick={setActiveNoteId} />
+              <PageContent items={currentPage()} imageAssets={imageAssets()} onNoteClick={setActiveNoteId} />
             </Show>
           </div>
           <Show when={isTwoPageView()}>
             <div class="reader-page">
               <Show when={ready()}>
-                <PageContent items={secondPage()} onNoteClick={setActiveNoteId} />
+                <PageContent items={secondPage()} imageAssets={imageAssets()} onNoteClick={setActiveNoteId} />
               </Show>
             </div>
           </Show>

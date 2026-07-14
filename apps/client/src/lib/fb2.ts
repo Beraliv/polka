@@ -7,7 +7,20 @@ export type ParsedBook = {
   lang?: string;
   sections: SectionItem[];
   notes: Record<string, Note>;
+  // Data URLs built from <binary> elements, keyed by their id attribute.
+  images: Record<string, string>;
 };
+
+// Resolves the id referenced by an FB2 link attribute (l:href / xlink:href / href).
+function linkedResourceId(el: Element): string | undefined {
+  const href =
+    el.getAttribute('l:href') ??
+    el.getAttribute('xlink:href') ??
+    el.getAttribute('href') ??
+    '';
+  const id = href.startsWith('#') ? href.slice(1) : href;
+  return id || undefined;
+}
 
 function getTitle(section: Element): string | undefined {
   const titleEl = section.querySelector(':scope > title');
@@ -30,12 +43,7 @@ function parseParagraphElement(el: Element): RichParagraph {
       const child = node as Element;
       const tag = child.tagName.toLowerCase();
       if (tag === 'a' && child.getAttribute('type') === 'note') {
-        const href =
-          child.getAttribute('l:href') ??
-          child.getAttribute('xlink:href') ??
-          child.getAttribute('href') ??
-          '';
-        const noteId = href.startsWith('#') ? href.slice(1) : href;
+        const noteId = linkedResourceId(child);
         const label = child.textContent?.trim() ?? '';
         if (noteId && label) {
           segments.push({ noteId, label } satisfies NoteRef);
@@ -48,37 +56,63 @@ function parseParagraphElement(el: Element): RichParagraph {
   return segments;
 }
 
-// Collect all <p>/<v>/<empty-line> descendants of el, skipping <annotation>, <title>, and nested <section> subtrees.
+function parseImageElement(el: Element): BookParagraph | undefined {
+  const imageId = linkedResourceId(el);
+  return imageId ? { type: ParagraphType.Image, imageId } : undefined;
+}
+
+// A <p>/<v> may wrap illustrations (<p><image .../></p>); emit those as
+// standalone image paragraphs ahead of the remaining text, if any.
+function collectTextParagraph(el: Element, out: BookParagraph[]): void {
+  el.querySelectorAll('image').forEach((imageEl) => {
+    const image = parseImageElement(imageEl);
+    if (image) out.push(image);
+  });
+  const paragraph = parseParagraphElement(el);
+  if (paragraph.length > 0) out.push(paragraph);
+}
+
+// Collect all <p>/<v>/<empty-line>/<image> descendants of el, skipping <annotation>, <title>, and nested <section> subtrees.
 function collectParagraphs(el: Element, out: BookParagraph[]): void {
   for (const child of el.children) {
     const tag = child.tagName.toLowerCase();
     if (tag === 'p' || tag === 'v') {
-      const paragraph = parseParagraphElement(child);
-      if (paragraph.length > 0) out.push(paragraph);
+      collectTextParagraph(child, out);
     } else if (tag === 'empty-line') {
       out.push({ type: ParagraphType.EmptyLine });
+    } else if (tag === 'image') {
+      const image = parseImageElement(child);
+      if (image) out.push(image);
     } else if (tag !== 'annotation' && tag !== 'title' && tag !== 'section') {
       collectParagraphs(child, out);
     }
   }
 }
 
-// Collect <p>/<v>/<empty-line> from a section's direct non-title, non-section, non-annotation children.
+// Collect <p>/<v>/<empty-line>/<image> from a section's direct non-title, non-section, non-annotation children.
 function collectDirectParagraphs(section: Element): BookParagraph[] {
   const out: BookParagraph[] = [];
   for (const child of section.children) {
     const tag = child.tagName.toLowerCase();
     if (tag === 'title' || tag === 'section' || tag === 'annotation') continue;
     if (tag === 'p' || tag === 'v') {
-      const paragraph = parseParagraphElement(child);
-      if (paragraph.length > 0) out.push(paragraph);
+      collectTextParagraph(child, out);
     } else if (tag === 'empty-line') {
       out.push({ type: ParagraphType.EmptyLine });
+    } else if (tag === 'image') {
+      const image = parseImageElement(child);
+      if (image) out.push(image);
     } else {
-      // poem, epigraph, cite, etc. — grab all p/v/empty-line descendants
-      child.querySelectorAll('p, v, empty-line').forEach((el) => {
-        if (el.tagName.toLowerCase() === 'empty-line') {
+      // poem, epigraph, cite, etc. — grab all p/v/empty-line/image descendants
+      child.querySelectorAll('p, v, empty-line, image').forEach((el) => {
+        const nestedTag = el.tagName.toLowerCase();
+        if (nestedTag === 'empty-line') {
           out.push({ type: ParagraphType.EmptyLine });
+          return;
+        }
+        if (nestedTag === 'image') {
+          const image = parseImageElement(el);
+          if (image) out.push(image);
           return;
         }
         const paragraph = parseParagraphElement(el);
@@ -146,6 +180,20 @@ function parseNotes(doc: Document): Record<string, Note> {
   return notes;
 }
 
+// Turn each <binary id content-type>base64</binary> element into a data URL.
+function parseBinaryImages(doc: Document): Record<string, string> {
+  const images: Record<string, string> = {};
+  doc.querySelectorAll('FictionBook > binary').forEach((binaryEl) => {
+    const id = binaryEl.getAttribute('id');
+    if (!id) return;
+    const contentType = binaryEl.getAttribute('content-type');
+    if (!contentType) return;
+    const base64 = binaryEl.textContent?.replace(/\s+/g, '') ?? '';
+    if (base64) images[id] = `data:${contentType};base64,${base64}`;
+  });
+  return images;
+}
+
 export function parseFB2(buffer: ArrayBuffer): ParsedBook {
   const xml = new TextDecoder('utf-8').decode(buffer);
   const doc = new DOMParser().parseFromString(xml, 'application/xml');
@@ -161,6 +209,7 @@ export function parseFB2(buffer: ArrayBuffer): ParsedBook {
   const lang = doc.querySelector('title-info > lang')?.textContent?.trim() || undefined;
 
   const notes = parseNotes(doc);
+  const images = parseBinaryImages(doc);
 
   const sections: SectionItem[] = [];
 
@@ -181,5 +230,5 @@ export function parseFB2(buffer: ArrayBuffer): ParsedBook {
     }
   });
 
-  return { title, author, lang, sections, notes };
+  return { title, author, lang, sections, notes, images };
 }

@@ -22,6 +22,8 @@ const [store, setStore] = createStore({
   serverUrl: load<string>(SERVER_URL_KEY, ''),
   sections: {} as Record<string, SectionItem[]>,
   notes: {} as Record<string, Record<string, Note>>,
+  // Book image data URLs keyed by book id, then by image id.
+  images: {} as Record<string, Record<string, string>>,
 });
 
 export { store, setStore };
@@ -30,11 +32,12 @@ type AddBookOptions = {
   book: Book;
   sections: SectionItem[];
   notes?: Record<string, Note>;
+  images?: Record<string, string>;
   arrayBuffer: ArrayBuffer;
 };
 
 export class BookStore {
-  static async uploadBook({ book, sections, notes, arrayBuffer }: AddBookOptions): Promise<void> {
+  static async uploadBook({ book, sections, notes, images, arrayBuffer }: AddBookOptions): Promise<void> {
     setStore('books', (prev) => {
       const next = [book, ...prev.filter((b) => b.id !== book.id)];
       try {
@@ -48,6 +51,7 @@ export class BookStore {
     if (notes) {
       setStore('notes', book.id, notes);
     }
+    setStore('images', book.id, images ?? {});
     try {
       await BookFilesDB.upload(book.id, { arrayBuffer, format: book.format });
       console.log(`[uploadBook] Successfully uploaded book ${book.id} to IndexedDB`);

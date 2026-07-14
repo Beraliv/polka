@@ -1,4 +1,5 @@
-import type { SectionItem, RichParagraph, NoteRef, Note } from './paginate.ts';
+import { ParagraphType } from './paginate.ts';
+import type { SectionItem, RichParagraph, BookParagraph, NoteRef, Note } from './paginate.ts';
 
 export type ParsedBook = {
   title: string;
@@ -47,31 +48,39 @@ function parseParagraphElement(el: Element): RichParagraph {
   return segments;
 }
 
-// Collect all <p>/<v> descendants of el, skipping <annotation>, <title>, and nested <section> subtrees.
-function collectParagraphs(el: Element, out: RichParagraph[]): void {
+// Collect all <p>/<v>/<empty-line> descendants of el, skipping <annotation>, <title>, and nested <section> subtrees.
+function collectParagraphs(el: Element, out: BookParagraph[]): void {
   for (const child of el.children) {
     const tag = child.tagName.toLowerCase();
     if (tag === 'p' || tag === 'v') {
       const paragraph = parseParagraphElement(child);
       if (paragraph.length > 0) out.push(paragraph);
+    } else if (tag === 'empty-line') {
+      out.push({ type: ParagraphType.EmptyLine });
     } else if (tag !== 'annotation' && tag !== 'title' && tag !== 'section') {
       collectParagraphs(child, out);
     }
   }
 }
 
-// Collect <p>/<v> from a section's direct non-title, non-section, non-annotation children.
-function collectDirectParagraphs(section: Element): RichParagraph[] {
-  const out: RichParagraph[] = [];
+// Collect <p>/<v>/<empty-line> from a section's direct non-title, non-section, non-annotation children.
+function collectDirectParagraphs(section: Element): BookParagraph[] {
+  const out: BookParagraph[] = [];
   for (const child of section.children) {
     const tag = child.tagName.toLowerCase();
     if (tag === 'title' || tag === 'section' || tag === 'annotation') continue;
     if (tag === 'p' || tag === 'v') {
       const paragraph = parseParagraphElement(child);
       if (paragraph.length > 0) out.push(paragraph);
+    } else if (tag === 'empty-line') {
+      out.push({ type: ParagraphType.EmptyLine });
     } else {
-      // poem, epigraph, cite, etc. — grab all p/v descendants
-      child.querySelectorAll('p, v').forEach((el) => {
+      // poem, epigraph, cite, etc. — grab all p/v/empty-line descendants
+      child.querySelectorAll('p, v, empty-line').forEach((el) => {
+        if (el.tagName.toLowerCase() === 'empty-line') {
+          out.push({ type: ParagraphType.EmptyLine });
+          return;
+        }
         const paragraph = parseParagraphElement(el);
         if (paragraph.length > 0) out.push(paragraph);
       });
@@ -161,7 +170,7 @@ export function parseFB2(buffer: ArrayBuffer): ParsedBook {
     const topSections = childSections(body);
 
     if (topSections.length === 0) {
-      const paragraphs: RichParagraph[] = [];
+      const paragraphs: BookParagraph[] = [];
       collectParagraphs(body, paragraphs);
       if (paragraphs.length > 0) sections.push({ paragraphs });
       return;

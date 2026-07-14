@@ -450,6 +450,11 @@ h5.reader-section-title { font-size: 0.9rem; }
   margin-bottom: 0;
 }
 
+/* FB2 <empty-line/>: a fixed-height blank block between paragraphs */
+.reader-empty-line {
+  height: 1.2em;
+}
+
 @media (min-width: 900px) {
   .reader-content {
     padding: 32px 64px;

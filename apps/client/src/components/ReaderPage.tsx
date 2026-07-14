@@ -1,4 +1,4 @@
-import { createSignal, createEffect, For, Show, onMount, onCleanup, batch } from 'solid-js';
+import { createSignal, createEffect, For, Show, Switch, Match, onMount, onCleanup, batch } from 'solid-js';
 import { Dynamic } from 'solid-js/web';
 import { useNavigate, useParams } from '@solidjs/router';
 import { store, setStore, BookStore } from '../store/books.ts';
@@ -6,6 +6,7 @@ import { loadProgress, loadRemoteProgress, saveProgress } from '../lib/progress.
 import { BookFilesDB } from '../lib/polka-db.ts';
 import { parseEPUB } from '../lib/epub.ts';
 import { parseFB2 } from '../lib/fb2.ts';
+import { isEmptyLine, ParagraphType } from '../lib/paginate.ts';
 import type { SectionItem, Page, RichParagraph, NoteRef, Note } from '../lib/paginate.ts';
 import type { Progress } from '@polka/shared';
 
@@ -111,8 +112,24 @@ function buildPages(pageEl: HTMLElement, sections: SectionItem[]): Page[] {
       container.appendChild(headingEl);
     }
 
-    for (const para of section.paragraphs) {
-      let remaining: Token[] = tokenize(para);
+    for (const paragraph of section.paragraphs) {
+      if (isEmptyLine(paragraph)) {
+        // An empty line at the top of a page carries no meaning — drop it.
+        if (current.length === 0) continue;
+        const emptyLineEl = document.createElement('div');
+        emptyLineEl.className = 'reader-empty-line';
+        container.appendChild(emptyLineEl);
+        if (container.scrollHeight <= availableHeight) {
+          current.push({ type: ParagraphType.EmptyLine });
+        } else {
+          container.removeChild(emptyLineEl);
+          flush(current);
+          current = [];
+        }
+        continue;
+      }
+
+      let remaining: Token[] = tokenize(paragraph);
       // The tail of a paragraph split across a page boundary continues the
       // same paragraph, so it must render without the first-line indent.
       let isContinuation = false;
@@ -180,28 +197,33 @@ function PageContent(props: PageContentProps) {
   return (
     <For each={props.items}>
       {(item) => (
-        <Show when={item.content !== undefined} fallback={
+        <Switch fallback={
           <Dynamic component={`h${item.level ?? 1}`} class="reader-section-title">{item.title}</Dynamic>
         }>
-          <p class="reader-paragraph" classList={{ 'no-indent': item.noIndent }}>
-            <For each={item.content!}>
-              {(span) => {
-                if (typeof span === 'string') return <>{span}</>;
-                return (
-                  <button
-                    class="footnote-ref"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      props.onNoteClick(span.noteId);
-                    }}
-                  >
-                    {span.label}
-                  </button>
-                );
-              }}
-            </For>
-          </p>
-        </Show>
+          <Match when={item.type === ParagraphType.EmptyLine}>
+            <div class="reader-empty-line" />
+          </Match>
+          <Match when={item.content !== undefined}>
+            <p class="reader-paragraph" classList={{ 'no-indent': item.noIndent }}>
+              <For each={item.content!}>
+                {(span) => {
+                  if (typeof span === 'string') return <>{span}</>;
+                  return (
+                    <button
+                      class="footnote-ref"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        props.onNoteClick(span.noteId);
+                      }}
+                    >
+                      {span.label}
+                    </button>
+                  );
+                }}
+              </For>
+            </p>
+          </Match>
+        </Switch>
       )}
     </For>
   );

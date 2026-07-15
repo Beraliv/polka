@@ -1,6 +1,6 @@
 import { createStore } from 'solid-js/store';
 import type { Book, SMBConfig } from '@polka/shared';
-import type { SectionItem, Note } from '../lib/paginate.ts';
+import type { SectionItem, Note } from '../lib/book';
 import { BookFilesDB, ProgressDB } from '../lib/polka-db.ts';
 
 const BOOKS_KEY = 'polka:books';

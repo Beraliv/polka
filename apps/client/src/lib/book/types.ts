@@ -32,6 +32,20 @@ export function isImage(paragraph: BookParagraph): paragraph is BookImage {
 export type SectionItem =
   | { level?: number; title?: string; paragraphs: BookParagraph[] }
 
+/**
+ * Format-independent result of parsing a book file. Parsers that have no
+ * notes or images return empty records rather than omitting the fields.
+ */
+export type ParsedBook = {
+  title: string;
+  author?: string;
+  lang?: string;
+  sections: SectionItem[];
+  notes: Record<string, Note>;
+  // Data URLs keyed by image id, referenced from BookImage paragraphs.
+  images: Record<string, string>;
+};
+
 export type PageItem =
   | { title?: never; level?: never; type?: never; imageId?: never; imageHeight?: never; content: RichParagraph; noIndent: boolean }
   | { title: string; level: number; content?: never; noIndent?: never; type?: never; imageId?: never; imageHeight?: never }

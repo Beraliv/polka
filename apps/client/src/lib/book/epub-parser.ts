@@ -1,14 +1,5 @@
 import { unzipSync } from 'fflate';
-import type { SectionItem, RichParagraph, Note } from './paginate.ts';
-
-export type ParsedBook = {
-  title: string;
-  author?: string;
-  lang?: string;
-  sections: SectionItem[];
-  notes?: Record<string, Note>;
-  images?: Record<string, string>;
-};
+import type { ParsedBook, SectionItem, RichParagraph } from './types.ts';
 
 function decode(bytes: Uint8Array): string {
   return new TextDecoder('utf-8').decode(bytes);
@@ -83,5 +74,7 @@ export function parseEPUB(buffer: ArrayBuffer): ParsedBook {
     }
   }
 
-  return { title, author, sections };
+  // TODO: add EPUB support for notes
+  // TODO: add EPUB support for images
+  return { title, author, sections, notes: {}, images: {} };
 }

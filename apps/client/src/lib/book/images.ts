@@ -1,4 +1,4 @@
-import type { BookImageAsset } from './paginate.ts';
+import type { BookImageAsset } from './types.ts';
 
 async function decodeImageAsset(dataUrl: string): Promise<BookImageAsset | null> {
   const image = new Image();

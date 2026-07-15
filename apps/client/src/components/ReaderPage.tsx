@@ -7,11 +7,8 @@ import { CloseIcon } from './CloseIcon.tsx';
 import { store, setStore, BookStore } from '../store/books.ts';
 import { loadProgress, loadRemoteProgress, saveProgress } from '../lib/progress.ts';
 import { BookFilesDB } from '../lib/polka-db.ts';
-import { parseEPUB } from '../lib/epub.ts';
-import { parseFB2 } from '../lib/fb2.ts';
-import { isEmptyLine, isImage, ParagraphType } from '../lib/paginate.ts';
-import type { SectionItem, Page, RichParagraph, NoteRef, Note, BookImageAsset } from '../lib/paginate.ts';
-import { decodeImageAssets } from '../lib/images.ts';
+import { parseBook, decodeImageAssets, isEmptyLine, isImage, ParagraphType } from '../lib/book';
+import type { SectionItem, Page, RichParagraph, NoteRef, Note, BookImageAsset } from '../lib/book';
 import type { Progress } from '@polka/shared';
 
 // Internal token for pagination: plain words or atomic note references.
@@ -385,10 +382,10 @@ export function ReaderPage() {
           navigate('/');
           return;
         }
-        const parsed = file.format === 'epub' ? parseEPUB(file.arrayBuffer) : parseFB2(file.arrayBuffer);
+        const parsed = parseBook({ buffer: file.arrayBuffer, format: file.format });
         setStore('sections', bookId, parsed.sections);
-        if (parsed.notes) setStore('notes', bookId, parsed.notes);
-        setStore('images', bookId, parsed.images ?? {});
+        setStore('notes', bookId, parsed.notes);
+        setStore('images', bookId, parsed.images);
       }
 
       // Decode image sizes before the first pagination so image heights are known.

@@ -1,15 +1,5 @@
-import { ParagraphType } from './paginate.ts';
-import type { SectionItem, RichParagraph, BookParagraph, NoteRef, Note } from './paginate.ts';
-
-export type ParsedBook = {
-  title: string;
-  author?: string;
-  lang?: string;
-  sections: SectionItem[];
-  notes: Record<string, Note>;
-  // Data URLs built from <binary> elements, keyed by their id attribute.
-  images: Record<string, string>;
-};
+import { ParagraphType } from './types.ts';
+import type { ParsedBook, SectionItem, RichParagraph, BookParagraph, NoteRef, Note } from './types.ts';
 
 // Resolves the id referenced by an FB2 link attribute (l:href / xlink:href / href).
 function linkedResourceId(el: Element): string | undefined {

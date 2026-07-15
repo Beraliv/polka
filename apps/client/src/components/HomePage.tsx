@@ -3,9 +3,7 @@ import { A, useNavigate } from '@solidjs/router';
 import { SettingsIcon } from './SettingsIcon.tsx';
 import { store, BookStore } from '../store/books.ts';
 import { allProgress } from '../lib/progress.ts';
-import { parseEPUB } from '../lib/epub.ts';
-import { parseFB2 } from '../lib/fb2.ts';
-import { computeBookId } from '../lib/bookId.ts';
+import { parseBook, computeBookId } from '../lib/book';
 import { downloadSMBFile } from '../lib/api';
 import { loadProgress, saveProgress } from '../lib/progress.ts';
 import { BookFilesDB } from '../lib/polka-db.ts';
@@ -53,7 +51,7 @@ export function HomePage() {
   function processBook(buffer: ArrayBuffer, filename: string): string {
     const ext = filename.split('.').pop()?.toLowerCase() as BookFormat;
     const bookId = computeBookId(buffer);
-    const parsed = ext === 'epub' ? parseEPUB(buffer) : parseFB2(buffer);
+    const parsed = parseBook({ buffer, format: ext });
     const book: Book = {
       id: bookId,
       name: parsed.title || filename,

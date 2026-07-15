@@ -2,7 +2,7 @@ import { createSignal, onMount, Show } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { HeartIcon } from './HeartIcon.tsx';
 import { store, BookStore } from '../store/books.ts';
-import { testSMB, fetchServerVersion } from '../lib/api.ts';
+import { testSMB, fetchServerVersion } from '../lib/api';
 import type { SMBConfig } from '@polka/shared';
 
 export function SettingsPage() {

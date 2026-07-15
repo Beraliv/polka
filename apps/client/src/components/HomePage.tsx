@@ -6,7 +6,7 @@ import { allProgress } from '../lib/progress.ts';
 import { parseEPUB } from '../lib/epub.ts';
 import { parseFB2 } from '../lib/fb2.ts';
 import { computeBookId } from '../lib/bookId.ts';
-import { downloadSMBFile } from '../lib/api.ts';
+import { downloadSMBFile } from '../lib/api';
 import { loadProgress, saveProgress } from '../lib/progress.ts';
 import { BookFilesDB } from '../lib/polka-db.ts';
 import { BookCard } from './BookCard.tsx';

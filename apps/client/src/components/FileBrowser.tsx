@@ -1,6 +1,6 @@
 import { createSignal, For, Show, onMount } from 'solid-js';
 import type { SMBConfig, FileEntry } from '@polka/shared';
-import { listSMBFiles } from '../lib/api.ts';
+import { listSMBFiles } from '../lib/api';
 
 type Props = {
   config: SMBConfig;

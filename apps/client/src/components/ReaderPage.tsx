@@ -1,6 +1,9 @@
 import { createSignal, createEffect, For, Show, Switch, Match, onMount, onCleanup, batch } from 'solid-js';
 import { Dynamic } from 'solid-js/web';
 import { useNavigate, useParams } from '@solidjs/router';
+import { ChevronLeftIcon } from './ChevronLeftIcon.tsx';
+import { ChevronRightIcon } from './ChevronRightIcon.tsx';
+import { CloseIcon } from './CloseIcon.tsx';
 import { store, setStore, BookStore } from '../store/books.ts';
 import { loadProgress, loadRemoteProgress, saveProgress } from '../lib/progress.ts';
 import { BookFilesDB } from '../lib/polka-db.ts';
@@ -540,9 +543,7 @@ export function ReaderPage() {
           title="Previous page"
           aria-label="Previous page"
         >
-          <svg width="10" height="18" viewBox="0 0 10 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8 2L2 9L8 16" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <ChevronLeftIcon />
         </button>
         <button
           class="reader-nav-overlay reader-nav-overlay--next"
@@ -551,9 +552,7 @@ export function ReaderPage() {
           title="Next page"
           aria-label="Next page"
         >
-          <svg width="10" height="18" viewBox="0 0 10 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M2 2L8 9L2 16" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <ChevronRightIcon />
         </button>
         <Show when={!ready()}>
           <div class="reader-loading"><span class="spinner" /></div>
@@ -593,9 +592,7 @@ export function ReaderPage() {
               <p class="note-popup-text">{activeNote()?.text}</p>
             </div>
             <button class="note-popup-close" onClick={() => setActiveNoteId(null)} aria-label="Close">
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M1 1L9 9M9 1L1 9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-              </svg>
+              <CloseIcon />
             </button>
           </div>
         </div>

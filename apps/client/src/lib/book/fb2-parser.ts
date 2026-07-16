@@ -1,4 +1,4 @@
-import { ParagraphType } from './types.ts';
+import { PageElementType } from './types.ts';
 import type { ParsedBook, SectionItem, RichParagraph, BookParagraph, NoteRef, Note } from './types.ts';
 
 // Resolves the id referenced by an FB2 link attribute (l:href / xlink:href / href).
@@ -48,7 +48,7 @@ function parseParagraphElement(el: Element): RichParagraph {
 
 function parseImageElement(el: Element): BookParagraph | undefined {
   const imageId = linkedResourceId(el);
-  return imageId ? { type: ParagraphType.Image, imageId } : undefined;
+  return imageId ? { type: PageElementType.Image, imageId } : undefined;
 }
 
 // A <p>/<v> may wrap illustrations (<p><image .../></p>); emit those as
@@ -69,7 +69,7 @@ function collectParagraphs(el: Element, out: BookParagraph[]): void {
     if (tag === 'p' || tag === 'v') {
       collectTextParagraph(child, out);
     } else if (tag === 'empty-line') {
-      out.push({ type: ParagraphType.EmptyLine });
+      out.push({ type: PageElementType.EmptyLine });
     } else if (tag === 'image') {
       const image = parseImageElement(child);
       if (image) out.push(image);
@@ -88,7 +88,7 @@ function collectDirectParagraphs(section: Element): BookParagraph[] {
     if (tag === 'p' || tag === 'v') {
       collectTextParagraph(child, out);
     } else if (tag === 'empty-line') {
-      out.push({ type: ParagraphType.EmptyLine });
+      out.push({ type: PageElementType.EmptyLine });
     } else if (tag === 'image') {
       const image = parseImageElement(child);
       if (image) out.push(image);
@@ -97,7 +97,7 @@ function collectDirectParagraphs(section: Element): BookParagraph[] {
       child.querySelectorAll('p, v, empty-line, image').forEach((el) => {
         const nestedTag = el.tagName.toLowerCase();
         if (nestedTag === 'empty-line') {
-          out.push({ type: ParagraphType.EmptyLine });
+          out.push({ type: PageElementType.EmptyLine });
           return;
         }
         if (nestedTag === 'image') {

@@ -7,7 +7,7 @@ import { CloseIcon } from './CloseIcon.tsx';
 import { store, setStore, BookStore } from '../store/books.ts';
 import { loadProgress, loadRemoteProgress, saveProgress } from '../lib/progress.ts';
 import { BookFilesDB } from '../lib/polka-db.ts';
-import { parseBook, decodeImageAssets, isEmptyLine, isImage, ParagraphType } from '../lib/book';
+import { parseBook, decodeImageAssets, isEmptyLine, isImage, PageElementType } from '../lib/book';
 import type { SectionItem, Page, RichParagraph, NoteRef, Note, BookImageAsset } from '../lib/book';
 import type { Progress } from '@polka/shared';
 
@@ -124,7 +124,7 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Page[
 
     if (section.title) {
       const level = Math.min(Math.max(section.level ?? 1, 1), 5);
-      current.push({ title: section.title, level });
+      current.push({ type: PageElementType.Heading, level, title: section.title });
       const headingEl = document.createElement(`h${level}`);
       headingEl.className = 'reader-section-title';
       headingEl.textContent = section.title;
@@ -152,7 +152,7 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Page[
           current = [];
           container.appendChild(imagePlaceholderEl);
         }
-        current.push({ type: ParagraphType.Image, imageId: paragraph.imageId, imageHeight });
+        current.push({ type: PageElementType.Image, imageId: paragraph.imageId, imageHeight });
         continue;
       }
 
@@ -163,7 +163,7 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Page[
         emptyLineEl.className = 'reader-empty-line';
         container.appendChild(emptyLineEl);
         if (container.scrollHeight <= availableHeight) {
-          current.push({ type: ParagraphType.EmptyLine });
+          current.push({ type: PageElementType.EmptyLine });
         } else {
           container.removeChild(emptyLineEl);
           flush(current);
@@ -184,7 +184,7 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Page[
         container.appendChild(paragraphEl);
 
         if (container.scrollHeight <= availableHeight) {
-          current.push({ content: tokensToRich(remaining), noIndent: isContinuation });
+          current.push({ type: PageElementType.Paragraph, content: tokensToRich(remaining), noIndent: isContinuation });
           remaining = [];
         } else {
           container.removeChild(paragraphEl);
@@ -196,7 +196,7 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Page[
           });
 
           if (fitting > 0) {
-            current.push({ content: tokensToRich(remaining.slice(0, fitting)), noIndent: isContinuation });
+            current.push({ type: PageElementType.Paragraph, content: tokensToRich(remaining.slice(0, fitting)), noIndent: isContinuation });
             remaining = remaining.slice(fitting);
             isContinuation = true;
             flush(current);
@@ -206,7 +206,7 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Page[
             current = [];
           } else {
             // Paragraph larger than a full page — include as-is to avoid infinite loop
-            current.push({ content: tokensToRich(remaining), noIndent: isContinuation });
+            current.push({ type: PageElementType.Paragraph, content: tokensToRich(remaining), noIndent: isContinuation });
             remaining = [];
             flush(current);
             current = [];
@@ -244,13 +244,14 @@ function PageContent(props: PageContentProps) {
   return (
     <For each={props.items}>
       {(item) => (
-        <Switch fallback={
-          <Dynamic component={`h${item.level ?? 1}`} class="reader-section-title">{item.title}</Dynamic>
-        }>
-          <Match when={item.type === ParagraphType.EmptyLine}>
+        <Switch>
+          <Match when={item.type === PageElementType.Heading}>
+            <Dynamic component={`h${item.level}`} class="reader-section-title">{item.title}</Dynamic>
+          </Match>
+          <Match when={item.type === PageElementType.EmptyLine}>
             <div class="reader-empty-line" />
           </Match>
-          <Match when={item.type === ParagraphType.Image}>
+          <Match when={item.type === PageElementType.Image}>
             <img
               class="reader-image"
               src={props.imageAssets[item.imageId!]?.dataUrl}
@@ -258,7 +259,7 @@ function PageContent(props: PageContentProps) {
               alt=""
             />
           </Match>
-          <Match when={item.content !== undefined}>
+          <Match when={item.type === PageElementType.Paragraph}>
             <p class="reader-paragraph" classList={{ 'no-indent': item.noIndent }}>
               <For each={item.content!}>
                 {(span) => {

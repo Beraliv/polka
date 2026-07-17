@@ -11,8 +11,8 @@ Small features per book format, as implemented in `apps/client/src/lib/book`.
 | Section titles | ✅ `<title>` | ✅ first `<h1>`–`<h3>` |
 | Heading levels (h1–h5) | ✅ nesting depth, max 5 | ❌ always level 1 |
 | Paragraph text | ✅ `<p>` | ✅ `<p>`, `<li>` |
-| Verse & wrapped blocks (poem, epigraph, cite) | ✅ `<v>` and descendants | ❌ |
-| Inline italic / bold | ✅ `<emphasis>` / `<strong>` | ❌ plain text only |
-| Footnote popups | ✅ `<a type="note">` + notes body | ❌ |
+| Verse & wrapped blocks (poem, epigraph, cite) | ✅ `<v>` and descendants | ✅ bare-text `<blockquote>` |
+| Inline italic / bold | ✅ `<emphasis>` / `<strong>` | ✅ `<em>` / `<i>` / `<strong>` / `<b>` |
+| Footnote popups | ✅ `<a type="note">` + notes body | ✅ `epub:type="noteref"` + endnote heuristics |
 | Images | ✅ `<binary>` base64 → data URL | ❌ |
 | Vertical gaps | ✅ `<empty-line/>` | ❌ |

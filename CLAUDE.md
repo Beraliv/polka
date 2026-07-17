@@ -24,6 +24,7 @@
 
 - **Every big slice of functionality must be documented in `README.md` under the "Features" section**, in the same commit that introduces it. Small fixes and internal refactors don't need a README entry.
 - **Small features must be documented in `docs/features.md`**, in the same commit that introduces them.
+- **README's Features section must not repeat `docs/features.md`.** A feature belongs in exactly one place: format-level parser/reader capabilities (anything with an FB2/EPUB dimension) go in the `docs/features.md` matrix only; README keeps app-level features and the link to the matrix.
 
 ## Versioning
 

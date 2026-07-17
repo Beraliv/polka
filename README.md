@@ -2,6 +2,13 @@
 
 A mobile-first e-book reader for EPUB and FB2 files, designed to run on TrueNAS. Browse your NAS book collection over SMB, or open files directly from your device. Progress is saved locally and optionally synced to the server.
 
+<details>
+<summary>Screenshots</summary>
+
+<img src="docs/HomePage-0.5.0.png" alt="Empty library" width="245"> <img src="docs/HomePageWithFiles-0.5.5.png" alt="Library with FB2 and EPUB books in progress" width="245"> <img src="docs/HomePageWithNasNavigation-0.5.0.png" alt="NAS file browser sheet over the library" width="245"> <img src="docs/SettingsPage-1-0.5.0.png" alt="NAS settings: connection form" width="245"> <img src="docs/SettingsPage-2-0.5.0.png" alt="NAS settings: versions, credit and GitHub link" width="245"> <img src="docs/ReaderPage-epub-0.6.0.png" alt="Reader with an EPUB book" width="245"> <img src="docs/ReaderPage-fb2-0.6.0.png" alt="Reader with an FB2 book" width="245"> <img src="docs/ReaderPageWithFootnote-fb2-0.6.0.png" alt="Reader with an FB2 footnote popup" width="245">
+
+</details>
+
 ## Features
 
 - Read **EPUB** and **FB2** books

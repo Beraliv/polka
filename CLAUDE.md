@@ -23,6 +23,7 @@
 ## Documentation
 
 - **Every big slice of functionality must be documented in `README.md` under the "Features" section**, in the same commit that introduces it. Small fixes and internal refactors don't need a README entry.
+- **Small features must be documented in `docs/features.md`**, in the same commit that introduces them.
 
 ## Versioning
 

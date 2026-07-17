@@ -1,5 +1,8 @@
 # Polka
 
+> [!NOTE]
+> The name comes from the Russian word **полка** (*polka*) — "shelf", as in a bookshelf.
+
 A mobile-first e-book reader for EPUB and FB2 files, designed to run on TrueNAS. Browse your NAS book collection over SMB, or open files directly from your device. Progress is saved locally and optionally synced to the server.
 
 <details>

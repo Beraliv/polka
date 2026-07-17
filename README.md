@@ -10,6 +10,7 @@ A mobile-first e-book reader for EPUB and FB2 files, designed to run on TrueNAS.
 - **Books persist across reloads** — stored in IndexedDB, no re-download needed
 - **Progress sync** — saved to IndexedDB and optionally synced to the server
 - **Footnote popups** — tap inline references to read notes without leaving the page
+- **Inline text styling** — italic and bold runs (FB2 `<emphasis>`/`<strong>`) render as in the original book
 - **Mobile-first** — swipe left/right to turn pages; keyboard arrows and spacebar also work
 - **Two-page spread on desktop** — wide screens (≥900px) show two pages side by side, like an open book
 - **Page-based rendering** — only the current page is in the DOM, so even large books stay fast

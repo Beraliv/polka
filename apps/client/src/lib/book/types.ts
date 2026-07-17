@@ -3,7 +3,30 @@
 
 export type Note = { title?: string; text: string };
 export type NoteRef = { noteId: string; label: string };
-export type RichParagraph = (string | NoteRef)[];
+
+/**
+ * Inline text styling shared by every book format. The FB2 parser maps
+ * <emphasis>/<strong> onto these flags; an EPUB parser can map
+ * <em>/<i>/<strong>/<b> onto the same flags. Add new fields here to support
+ * more inline styles across formats.
+ */
+export type TextStyle = {
+  italic?: boolean;
+  bold?: boolean;
+};
+
+export function hasAnyStyle(style: TextStyle): boolean {
+  return Boolean(style.italic || style.bold);
+}
+
+/** A run of paragraph text carrying at least one TextStyle flag. */
+export type RichText = { text: string; style: TextStyle };
+
+export type Paragraph = (string | RichText | NoteRef)[];
+
+export function isNoteRef(span: unknown): span is NoteRef {
+  return typeof span === 'object' && span !== null && 'noteId' in span;
+}
 
 /**
  * Vertical gap produced by FB2 <empty-line/>; rendered as a fixed-height blank
@@ -14,7 +37,7 @@ export type EmptyLine = { type: typeof PageElementType.EmptyLine };
  * Block-level FB2 <image l:href="#id"/> pointing at a <binary id="..."> element.
  */
 export type BookImage = { type: typeof PageElementType.Image; imageId: string };
-export type BookParagraph = RichParagraph | EmptyLine | BookImage;
+export type BookParagraph = Paragraph | EmptyLine | BookImage;
 
 // A <binary> image decoded for rendering: data URL plus intrinsic pixel size.
 export type BookImageAsset = { dataUrl: string; width: number; height: number };
@@ -54,7 +77,7 @@ export const PageElementType = {
 } as const;
 
 export type PageParagraphElement = {
-  content: RichParagraph;
+  content: Paragraph;
   noIndent: boolean;
   type: typeof PageElementType.Paragraph;
   // TODO: create via XOR type utility

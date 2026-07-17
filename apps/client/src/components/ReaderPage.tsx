@@ -7,44 +7,100 @@ import { CloseIcon } from './CloseIcon.tsx';
 import { store, setStore, BookStore } from '../store/books.ts';
 import { loadProgress, loadRemoteProgress, saveProgress } from '../lib/progress.ts';
 import { BookFilesDB } from '../lib/polka-db.ts';
-import { parseBook, decodeImageAssets, isEmptyLine, isImage, PageElementType } from '../lib/book';
-import type { SectionItem, Page, RichParagraph, NoteRef, Note, BookImageAsset } from '../lib/book';
+import { parseBook, decodeImageAssets, hasAnyStyle, isEmptyLine, isImage, isNoteRef, PageElementType } from '../lib/book';
+import type { SectionItem, Page, Paragraph, NoteRef, Note, BookImageAsset, TextStyle } from '../lib/book';
 import type { Progress } from '@polka/shared';
 
-// Internal token for pagination: plain words or atomic note references.
-type Token = { text: string } | NoteRef;
+// Internal token for pagination: words (optionally styled) or atomic note references.
+type Token = { text: string; style?: TextStyle } | NoteRef;
 
-function tokenize(paragraph: RichParagraph): Token[] {
+function splitIntoWords(text: string): string[] {
+  return text.split(/\s+/).filter(Boolean);
+}
+
+function tokenize(paragraph: Paragraph): Token[] {
   const tokens: Token[] = [];
   for (const span of paragraph) {
     if (typeof span === 'string') {
-      for (const word of span.split(/\s+/).filter(Boolean)) {
+      for (const word of splitIntoWords(span)) {
         tokens.push({ text: word });
       }
-    } else {
+    } else if (isNoteRef(span)) {
       tokens.push(span);
+    } else {
+      for (const word of splitIntoWords(span.text)) {
+        tokens.push({ text: word, style: span.style });
+      }
     }
   }
   return tokens;
 }
 
-function tokensText(tokens: Token[]): string {
-  return tokens.map((token) => ('text' in token ? token.text : token.label)).join(' ');
+function sameStyle(first: TextStyle | undefined, second: TextStyle | undefined): boolean {
+  return (
+    Boolean(first?.italic) === Boolean(second?.italic) && Boolean(first?.bold) === Boolean(second?.bold)
+  );
 }
 
-function tokensToRich(tokens: Token[]): RichParagraph {
-  const segments: RichParagraph = [];
+function tokensToRich(tokens: Token[]): Paragraph {
+  const segments: Paragraph = [];
   let textBuffer = '';
-  for (const token of tokens) {
-    if ('text' in token) {
-      textBuffer += (textBuffer ? ' ' : '') + token.text;
+  let bufferStyle: TextStyle | undefined;
+
+  const flushTextBuffer = () => {
+    if (!textBuffer) return;
+    if (bufferStyle && hasAnyStyle(bufferStyle)) {
+      segments.push({ text: textBuffer, style: bufferStyle });
     } else {
-      if (textBuffer) { segments.push(textBuffer); textBuffer = ''; }
+      segments.push(textBuffer);
+    }
+    textBuffer = '';
+  };
+
+  for (const token of tokens) {
+    if (isNoteRef(token)) {
+      flushTextBuffer();
       segments.push(token);
+      continue;
+    }
+    if (textBuffer && !sameStyle(bufferStyle, token.style)) {
+      // Keep the word gap visible across a style boundary.
+      textBuffer += ' ';
+      flushTextBuffer();
+    }
+    bufferStyle = token.style;
+    textBuffer += (textBuffer ? ' ' : '') + token.text;
+  }
+  flushTextBuffer();
+  return segments;
+}
+
+type AppendRichTextOptions = { element: HTMLElement; segments: Paragraph };
+
+// Mirrors PageContent's paragraph markup inside the hidden measurement
+// container, so styled runs (wider bold glyphs, italics) measure exactly as
+// they render.
+function appendRichText({ element, segments }: AppendRichTextOptions): void {
+  for (const segment of segments) {
+    if (typeof segment === 'string') {
+      element.append(segment);
+    } else if (isNoteRef(segment)) {
+      element.append(segment.label);
+    } else {
+      let host: HTMLElement = element;
+      if (segment.style.bold) {
+        const strongEl = document.createElement('strong');
+        host.append(strongEl);
+        host = strongEl;
+      }
+      if (segment.style.italic) {
+        const emEl = document.createElement('em');
+        host.append(emEl);
+        host = emEl;
+      }
+      host.append(segment.text);
     }
   }
-  if (textBuffer) segments.push(textBuffer);
-  return segments;
 }
 
 type MaxFittingTokensOptions = {
@@ -60,7 +116,8 @@ function maxFittingTokens({ container, tokens, availableHeight, noIndent }: MaxF
   let low = 0, high = tokens.length - 1, count = 0;
   while (low <= high) {
     const mid = Math.floor((low + high) / 2);
-    measureEl.textContent = tokensText(tokens.slice(0, mid + 1));
+    measureEl.textContent = '';
+    appendRichText({ element: measureEl, segments: tokensToRich(tokens.slice(0, mid + 1)) });
     container.appendChild(measureEl);
     const fits = container.scrollHeight <= availableHeight;
     container.removeChild(measureEl);
@@ -180,7 +237,7 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Page[
       while (remaining.length > 0) {
         const paragraphEl = document.createElement('p');
         paragraphEl.className = isContinuation ? 'reader-paragraph no-indent' : 'reader-paragraph';
-        paragraphEl.textContent = tokensText(remaining);
+        appendRichText({ element: paragraphEl, segments: tokensToRich(remaining) });
         container.appendChild(paragraphEl);
 
         if (container.scrollHeight <= availableHeight) {
@@ -264,17 +321,21 @@ function PageContent(props: PageContentProps) {
               <For each={item.content!}>
                 {(span) => {
                   if (typeof span === 'string') return <>{span}</>;
-                  return (
-                    <button
-                      class="footnote-ref"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        props.onNoteClick(span.noteId);
-                      }}
-                    >
-                      {span.label}
-                    </button>
-                  );
+                  if (isNoteRef(span)) {
+                    return (
+                      <button
+                        class="footnote-ref"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          props.onNoteClick(span.noteId);
+                        }}
+                      >
+                        {span.label}
+                      </button>
+                    );
+                  }
+                  const italicText = span.style.italic ? <em>{span.text}</em> : <>{span.text}</>;
+                  return span.style.bold ? <strong>{italicText}</strong> : italicText;
                 }}
               </For>
             </p>

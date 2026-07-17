@@ -3,12 +3,14 @@ export { parseFB2 } from './fb2-parser.ts';
 export { parseEPUB } from './epub-parser.ts';
 export { computeBookId } from './book-id.ts';
 export { decodeImageAssets } from './images.ts';
-export { PageElementType, isEmptyLine, isImage } from './types.ts';
+export { PageElementType, hasAnyStyle, isEmptyLine, isImage, isNoteRef } from './types.ts';
 export type {
   ParsedBook,
   SectionItem,
   BookParagraph,
-  RichParagraph,
+  Paragraph,
+  TextStyle,
+  RichText,
   EmptyLine,
   BookImage,
   BookImageAsset,

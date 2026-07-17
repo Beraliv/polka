@@ -1,5 +1,5 @@
 import { unzipSync } from 'fflate';
-import type { ParsedBook, SectionItem, RichParagraph } from './types.ts';
+import type { ParsedBook, SectionItem, Paragraph } from './types.ts';
 
 function decode(bytes: Uint8Array): string {
   return new TextDecoder('utf-8').decode(bytes);
@@ -12,7 +12,7 @@ function extractSectionItem(html: string): SectionItem {
   const headingEl = doc.querySelector('h1, h2, h3');
   const title = headingEl?.textContent?.trim() || undefined;
 
-  const paragraphs: RichParagraph[] = [];
+  const paragraphs: Paragraph[] = [];
   doc.querySelectorAll('p, li').forEach((el) => {
     const text = el.textContent?.trim();
     if (text) paragraphs.push([text]);

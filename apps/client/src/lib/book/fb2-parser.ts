@@ -1,5 +1,5 @@
-import { PageElementType } from './types.ts';
-import type { ParsedBook, SectionItem, RichParagraph, BookParagraph, NoteRef, Note } from './types.ts';
+import { PageElementType, hasAnyStyle } from './types.ts';
+import type { ParsedBook, SectionItem, Paragraph, BookParagraph, NoteRef, Note, TextStyle } from './types.ts';
 
 // Resolves the id referenced by an FB2 link attribute (l:href / xlink:href / href).
 function linkedResourceId(el: Element): string | undefined {
@@ -23,12 +23,21 @@ function getTitle(section: Element): string | undefined {
   return parts.join(' ') || undefined;
 }
 
-function parseParagraphElement(el: Element): RichParagraph {
-  const segments: RichParagraph = [];
-  for (const node of el.childNodes) {
+type ParseInlineContentOptions = { element: Element; inheritedStyle: TextStyle };
+
+// Walks the inline content of a paragraph-like element, tracking the style
+// accumulated from enclosing <emphasis>/<strong> elements.
+function parseInlineContent({ element, inheritedStyle }: ParseInlineContentOptions): Paragraph {
+  const segments: Paragraph = [];
+  for (const node of element.childNodes) {
     if (node.nodeType === Node.TEXT_NODE) {
       const text = node.textContent ?? '';
-      if (text) segments.push(text);
+      if (!text) continue;
+      if (hasAnyStyle(inheritedStyle)) {
+        segments.push({ text, style: inheritedStyle });
+      } else {
+        segments.push(text);
+      }
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const child = node as Element;
       const tag = child.tagName.toLowerCase();
@@ -38,12 +47,24 @@ function parseParagraphElement(el: Element): RichParagraph {
         if (noteId && label) {
           segments.push({ noteId, label } satisfies NoteRef);
         }
+      } else if (tag === 'emphasis') {
+        segments.push(
+          ...parseInlineContent({ element: child, inheritedStyle: { ...inheritedStyle, italic: true } }),
+        );
+      } else if (tag === 'strong') {
+        segments.push(
+          ...parseInlineContent({ element: child, inheritedStyle: { ...inheritedStyle, bold: true } }),
+        );
       } else {
-        segments.push(...parseParagraphElement(child));
+        segments.push(...parseInlineContent({ element: child, inheritedStyle }));
       }
     }
   }
   return segments;
+}
+
+function parseParagraphElement(el: Element): Paragraph {
+  return parseInlineContent({ element: el, inheritedStyle: {} });
 }
 
 function parseImageElement(el: Element): BookParagraph | undefined {

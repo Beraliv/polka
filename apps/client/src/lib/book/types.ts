@@ -80,44 +80,22 @@ export type PageParagraphElement = {
   content: Paragraph;
   noIndent: boolean;
   type: typeof PageElementType.Paragraph;
-  // TODO: create via XOR type utility
-  imageHeight?: never; 
-  imageId?: never;
-  level?: never;
-  title?: never;
 };
 
 export type PageHeadingElement = {
   level: number;
   title: string;
   type: typeof PageElementType.Heading;
-  // TODO: create via XOR type utility
-  content?: never;
-  imageHeight?: never;
-  imageId?: never;
-  noIndent?: never;
 }
 
 export type PageEmptyLineElement = {
   type: typeof PageElementType.EmptyLine;
-  // TODO: create via XOR type utility
-  content?: never;
-  imageHeight?: never;
-  imageId?: never;
-  level?: never;
-  noIndent?: never;
-  title?: never;
 }
 
 export type PageImageElement = {
   imageHeight: number;
   imageId: string;
   type: typeof PageElementType.Image;
-  // TODO: create via XOR type utility
-  content?: never;
-  level?: never;
-  noIndent?: never;
-  title?: never;
 };
 
 export type PageElement =
@@ -127,3 +105,24 @@ export type PageElement =
   | PageImageElement;
 
 export type Page = PageElement[];
+
+// Solid's <Show>/<Match> `when` prop cannot narrow a discriminated union from
+// a boolean condition. These helpers return the narrowed variant (or
+// undefined), so `when={asPageImage(item)}` + the keyed callback child give
+// the JSX a fully typed element without casts or non-null assertions.
+
+export function asPageParagraph(element: PageElement): PageParagraphElement | undefined {
+  return element.type === PageElementType.Paragraph ? element : undefined;
+}
+
+export function asPageHeading(element: PageElement): PageHeadingElement | undefined {
+  return element.type === PageElementType.Heading ? element : undefined;
+}
+
+export function asPageEmptyLine(element: PageElement): PageEmptyLineElement | undefined {
+  return element.type === PageElementType.EmptyLine ? element : undefined;
+}
+
+export function asPageImage(element: PageElement): PageImageElement | undefined {
+  return element.type === PageElementType.Image ? element : undefined;
+}

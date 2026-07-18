@@ -7,7 +7,19 @@ import { CloseIcon } from './CloseIcon.tsx';
 import { store, setStore, BookStore } from '../store/books.ts';
 import { loadProgress, loadRemoteProgress, saveProgress } from '../lib/progress.ts';
 import { BookFilesDB } from '../lib/polka-db.ts';
-import { parseBook, decodeImageAssets, hasAnyStyle, isEmptyLine, isImage, isNoteRef, PageElementType } from '../lib/book';
+import {
+  parseBook,
+  decodeImageAssets,
+  asPageEmptyLine,
+  asPageHeading,
+  asPageImage,
+  asPageParagraph,
+  hasAnyStyle,
+  isEmptyLine,
+  isImage,
+  isNoteRef,
+  PageElementType,
+} from '../lib/book';
 import type { SectionItem, Page, Paragraph, NoteRef, Note, BookImageAsset, TextStyle } from '../lib/book';
 import type { Progress } from '@polka/shared';
 
@@ -345,7 +357,7 @@ function ReaderImage(props: ReaderImageProps) {
 
 type PageContentProps = {
   items: Page;
-  imageAssets: Record<string, BookImageAsset>;
+  imageAssets: Record<string, BookImageAsset | undefined>;
   onNoteClick: (noteId: string) => void;
   onImageOpen: (imageId: string) => void;
 };
@@ -355,45 +367,48 @@ function PageContent(props: PageContentProps) {
     <For each={props.items}>
       {(item) => (
         <Switch>
-          <Match when={item.type === PageElementType.Heading}>
-            <Dynamic component={`h${item.level}`} class="reader-section-title">{item.title}</Dynamic>
+          <Match when={asPageHeading(item)} keyed>
+            {(heading) => (
+              <Dynamic component={`h${heading.level}`} class="reader-section-title">{heading.title}</Dynamic>
+            )}
           </Match>
-          <Match when={item.type === PageElementType.EmptyLine}>
+          <Match when={asPageEmptyLine(item)}>
             <div class="reader-empty-line" />
           </Match>
-          <Match when={item.type === PageElementType.Image}>
-            {/* narrow down type in TypeScript */}
-            {item.type === PageElementType.Image && (
+          <Match when={asPageImage(item)} keyed>
+            {(image) => (
               <ReaderImage
-                src={props.imageAssets[item.imageId]?.dataUrl}
-                height={item.imageHeight}
-                onOpen={() => props.onImageOpen(item.imageId)}
+                src={props.imageAssets[image.imageId]?.dataUrl}
+                height={image.imageHeight}
+                onOpen={() => props.onImageOpen(image.imageId)}
               />
             )}
           </Match>
-          <Match when={item.type === PageElementType.Paragraph}>
-            <p class="reader-paragraph" classList={{ 'no-indent': item.noIndent }}>
-              <For each={item.content!}>
-                {(span) => {
-                  if (typeof span === 'string') return <>{span}</>;
-                  if (isNoteRef(span)) {
-                    return (
-                      <button
-                        class="footnote-ref"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          props.onNoteClick(span.noteId);
-                        }}
-                      >
-                        {span.label}
-                      </button>
-                    );
-                  }
-                  const italicText = span.style.italic ? <em>{span.text}</em> : <>{span.text}</>;
-                  return span.style.bold ? <strong>{italicText}</strong> : italicText;
-                }}
-              </For>
-            </p>
+          <Match when={asPageParagraph(item)} keyed>
+            {(paragraph) => (
+              <p class="reader-paragraph" classList={{ 'no-indent': paragraph.noIndent }}>
+                <For each={paragraph.content}>
+                  {(span) => {
+                    if (typeof span === 'string') return <>{span}</>;
+                    if (isNoteRef(span)) {
+                      return (
+                        <button
+                          class="footnote-ref"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            props.onNoteClick(span.noteId);
+                          }}
+                        >
+                          {span.label}
+                        </button>
+                      );
+                    }
+                    const italicText = span.style.italic ? <em>{span.text}</em> : <>{span.text}</>;
+                    return span.style.bold ? <strong>{italicText}</strong> : italicText;
+                  }}
+                </For>
+              </p>
+            )}
           </Match>
         </Switch>
       )}
@@ -714,39 +729,43 @@ export function ReaderPage() {
         </div>
       </div>
 
-      <Show when={fullscreenImage() !== null}>
-        <div class="image-fullscreen-overlay" onClick={() => setFullscreenImageId(null)}>
-          <img
-            class="image-fullscreen-picture"
-            src={fullscreenImage()?.dataUrl}
-            alt=""
-            onClick={(event) => event.stopPropagation()}
-          />
-          <button
-            class="image-fullscreen-close"
-            onClick={() => setFullscreenImageId(null)}
-            title="Close"
-            aria-label="Close full screen image"
-          >
-            <CloseIcon />
-          </button>
-        </div>
-      </Show>
-
-      <Show when={activeNote() !== null}>
-        <div class="note-popup-overlay" onClick={() => setActiveNoteId(null)}>
-          <div class="note-popup" onClick={(e) => e.stopPropagation()}>
-            <div class="note-popup-content">
-              <Show when={activeNote()?.title}>
-                <h2 class="note-popup-title">{activeNote()?.title}</h2>
-              </Show>
-              <p class="note-popup-text">{activeNote()?.text}</p>
-            </div>
-            <button class="note-popup-close" onClick={() => setActiveNoteId(null)} aria-label="Close">
+      <Show when={fullscreenImage()} keyed>
+        {(image) => (
+          <div class="image-fullscreen-overlay" onClick={() => setFullscreenImageId(null)}>
+            <img
+              class="image-fullscreen-picture"
+              src={image.dataUrl}
+              alt=""
+              onClick={(event) => event.stopPropagation()}
+            />
+            <button
+              class="image-fullscreen-close"
+              onClick={() => setFullscreenImageId(null)}
+              title="Close"
+              aria-label="Close full screen image"
+            >
               <CloseIcon />
             </button>
           </div>
-        </div>
+        )}
+      </Show>
+
+      <Show when={activeNote()} keyed>
+        {(note) => (
+          <div class="note-popup-overlay" onClick={() => setActiveNoteId(null)}>
+            <div class="note-popup" onClick={(e) => e.stopPropagation()}>
+              <div class="note-popup-content">
+                <Show when={note.title}>
+                  <h2 class="note-popup-title">{note.title}</h2>
+                </Show>
+                <p class="note-popup-text">{note.text}</p>
+              </div>
+              <button class="note-popup-close" onClick={() => setActiveNoteId(null)} aria-label="Close">
+                <CloseIcon />
+              </button>
+            </div>
+          </div>
+        )}
       </Show>
     </div>
   );

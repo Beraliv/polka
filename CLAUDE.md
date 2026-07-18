@@ -20,6 +20,10 @@
 - This rule applies to all function types: plain functions, arrow functions, methods, and callbacks.
 - Exception: a well-known positional pair (e.g. `(error, result)` in a Node callback) is acceptable where it matches an established convention, but prefer the options-object style when in doubt.
 
+## UI
+
+- **Icons must be SVG, not ASCII/Unicode symbols.** When adding icon-like UI elements (close/X button, add/+ button, arrows, chevrons, etc.), use an inline SVG icon instead of text characters like `×`, `+`, `✕`, `→`, or `⚙`. Text glyphs render inconsistently across platforms and fonts; SVGs are crisp, stylable, and alignable.
+
 ## Documentation
 
 - **Every big slice of functionality must be documented in `README.md` under the "Features" section**, in the same commit that introduces it. Small fixes and internal refactors don't need a README entry.

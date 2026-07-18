@@ -291,10 +291,63 @@ function progressFraction(progress: Progress | null): number {
   return (progress.currentPage - 1) / (progress.totalPages - 1);
 }
 
+// A touch is treated as a tap only if the finger stayed within this distance,
+// mirroring the reader's page-turn tap detection.
+const TAP_MOVE_TOLERANCE_PX = 10;
+
+type ReaderImageProps = {
+  src: string | undefined;
+  height: number;
+  onOpen: () => void;
+};
+
+function ReaderImage(props: ReaderImageProps) {
+  let touchStartX = 0;
+  let touchStartY = 0;
+
+  function handleTouchStart(event: TouchEvent) {
+    const touch = event.touches[0];
+    if (touch) {
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+    }
+  }
+
+  function handleTouchEnd(event: TouchEvent) {
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    const isTap =
+      Math.abs(touch.clientX - touchStartX) <= TAP_MOVE_TOLERANCE_PX &&
+      Math.abs(touch.clientY - touchStartY) <= TAP_MOVE_TOLERANCE_PX;
+    if (!isTap) return;
+    // Suppress the synthetic click that follows the tap and keep the tap away
+    // from the reader's edge-tap page navigation.
+    event.preventDefault();
+    event.stopPropagation();
+    props.onOpen();
+  }
+
+  return (
+    <img
+      class="reader-image"
+      src={props.src}
+      style={{ height: `${props.height}px` }}
+      alt=""
+      onClick={(event) => {
+        event.stopPropagation();
+        props.onOpen();
+      }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    />
+  );
+}
+
 type PageContentProps = {
   items: Page;
   imageAssets: Record<string, BookImageAsset>;
   onNoteClick: (noteId: string) => void;
+  onImageOpen: (imageId: string) => void;
 };
 
 function PageContent(props: PageContentProps) {
@@ -309,12 +362,14 @@ function PageContent(props: PageContentProps) {
             <div class="reader-empty-line" />
           </Match>
           <Match when={item.type === PageElementType.Image}>
-            <img
-              class="reader-image"
-              src={props.imageAssets[item.imageId!]?.dataUrl}
-              style={{ height: `${item.imageHeight}px` }}
-              alt=""
-            />
+            {/* narrow down type in TypeScript */}
+            {item.type === PageElementType.Image && (
+              <ReaderImage
+                src={props.imageAssets[item.imageId]?.dataUrl}
+                height={item.imageHeight}
+                onOpen={() => props.onImageOpen(item.imageId)}
+              />
+            )}
           </Match>
           <Match when={item.type === PageElementType.Paragraph}>
             <p class="reader-paragraph" classList={{ 'no-indent': item.noIndent }}>
@@ -361,6 +416,7 @@ export function ReaderPage() {
   const [seeking, setSeeking] = createSignal(false);
   const [seekValue, setSeekValue] = createSignal('');
   const [activeNoteId, setActiveNoteId] = createSignal<string | null>(null);
+  const [fullscreenImageId, setFullscreenImageId] = createSignal<string | null>(null);
   const [imageAssets, setImageAssets] = createSignal<Record<string, BookImageAsset>>({});
   let smbPath: string | undefined;
   let contentEl: HTMLDivElement | undefined;
@@ -382,6 +438,12 @@ export function ReaderPage() {
     const id = activeNoteId();
     if (!id) return null;
     return store.notes?.[bookId]?.[id] ?? null;
+  };
+
+  const fullscreenImage = (): BookImageAsset | null => {
+    const id = fullscreenImageId();
+    if (!id) return null;
+    return imageAssets()[id] ?? null;
   };
 
   function openSeek() {
@@ -481,15 +543,16 @@ export function ReaderPage() {
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
-        if (activeNoteId()) return;
+        if (activeNoteId() || fullscreenImageId()) return;
         e.preventDefault();
         nextPage();
       } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-        if (activeNoteId()) return;
+        if (activeNoteId() || fullscreenImageId()) return;
         e.preventDefault();
         prevPage();
       } else if (e.key === 'Escape') {
-        if (activeNoteId()) setActiveNoteId(null);
+        if (fullscreenImageId()) setFullscreenImageId(null);
+        else if (activeNoteId()) setActiveNoteId(null);
         else if (seeking()) cancelSeek();
         else navigate('/');
       }
@@ -619,13 +682,23 @@ export function ReaderPage() {
         <div class="reader-pages">
           <div class="reader-page" ref={pageEl}>
             <Show when={ready()}>
-              <PageContent items={currentPage()} imageAssets={imageAssets()} onNoteClick={setActiveNoteId} />
+              <PageContent
+                items={currentPage()}
+                imageAssets={imageAssets()}
+                onNoteClick={setActiveNoteId}
+                onImageOpen={setFullscreenImageId}
+              />
             </Show>
           </div>
           <Show when={isTwoPageView()}>
             <div class="reader-page">
               <Show when={ready()}>
-                <PageContent items={secondPage()} imageAssets={imageAssets()} onNoteClick={setActiveNoteId} />
+                <PageContent
+                  items={secondPage()}
+                  imageAssets={imageAssets()}
+                  onNoteClick={setActiveNoteId}
+                  onImageOpen={setFullscreenImageId}
+                />
               </Show>
             </div>
           </Show>
@@ -640,6 +713,25 @@ export function ReaderPage() {
           <div class="reader-percent">{percent()}%</div>
         </div>
       </div>
+
+      <Show when={fullscreenImage() !== null}>
+        <div class="image-fullscreen-overlay" onClick={() => setFullscreenImageId(null)}>
+          <img
+            class="image-fullscreen-picture"
+            src={fullscreenImage()?.dataUrl}
+            alt=""
+            onClick={(event) => event.stopPropagation()}
+          />
+          <button
+            class="image-fullscreen-close"
+            onClick={() => setFullscreenImageId(null)}
+            title="Close"
+            aria-label="Close full screen image"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+      </Show>
 
       <Show when={activeNote() !== null}>
         <div class="note-popup-overlay" onClick={() => setActiveNoteId(null)}>

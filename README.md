@@ -22,6 +22,7 @@ A mobile-first e-book reader for EPUB and FB2 files, designed to run on TrueNAS.
 - **Mobile-first** — swipe left/right to turn pages; keyboard arrows and spacebar also work
 - **Two-page spread on desktop** — wide screens (≥900px) show two pages side by side, like an open book
 - **Page-based rendering** — only the current page is in the DOM, so even large books stay fast
+- **Full-screen images** — tap a book illustration to view it full screen; close with the X button or Escape
 - **Dark theme** — easy on the eyes for night reading
 - **Installable as a PWA** — add to home screen; app shell works offline
 - **Installable on TrueNAS SCALE** via Docker Compose

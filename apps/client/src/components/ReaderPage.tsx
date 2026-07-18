@@ -22,6 +22,7 @@ import {
 } from '../lib/book';
 import type { SectionItem, Page, Paragraph, NoteRef, Note, BookImageAsset, TextStyle } from '../lib/book';
 import type { Progress } from '@polka/shared';
+import { i18n } from '../i18n';
 
 // Internal token for pagination: words (optionally styled) or atomic note references.
 type Token = { text: string; style?: TextStyle } | NoteRef;
@@ -642,10 +643,10 @@ export function ReaderPage() {
   return (
     <div class="reader">
       <div class="reader-header">
-        <button class="icon-btn" onClick={() => navigate('/')} title="Back">←</button>
+        <button class="icon-btn" onClick={() => navigate('/')} title={i18n('reader.backTooltip')}>←</button>
         <span class="reader-book-title">{book()?.name ?? ''}</span>
         <Show when={seeking()} fallback={
-          <span class="reader-page-info" onClick={openSeek} title="Go to page">
+          <span class="reader-page-info" onClick={openSeek} title={i18n('reader.goToPageTooltip')}>
             {pageRangeLabel()} / {total()}
           </span>
         }>
@@ -677,8 +678,8 @@ export function ReaderPage() {
           class="reader-nav-overlay reader-nav-overlay--prev"
           onClick={prevPage}
           disabled={pageIdx() === 0}
-          title="Previous page"
-          aria-label="Previous page"
+          title={i18n('reader.previousPage')}
+          aria-label={i18n('reader.previousPage')}
         >
           <ChevronLeftIcon />
         </button>
@@ -686,8 +687,8 @@ export function ReaderPage() {
           class="reader-nav-overlay reader-nav-overlay--next"
           onClick={nextPage}
           disabled={lastVisiblePageNumber() >= total()}
-          title="Next page"
-          aria-label="Next page"
+          title={i18n('reader.nextPage')}
+          aria-label={i18n('reader.nextPage')}
         >
           <ChevronRightIcon />
         </button>
@@ -741,8 +742,8 @@ export function ReaderPage() {
             <button
               class="image-fullscreen-close"
               onClick={() => setFullscreenImageId(null)}
-              title="Close"
-              aria-label="Close full screen image"
+              title={i18n('reader.closeTooltip')}
+              aria-label={i18n('reader.ariaCloseFullscreenImage')}
             >
               <CloseIcon />
             </button>
@@ -760,7 +761,7 @@ export function ReaderPage() {
                 </Show>
                 <p class="note-popup-text">{note.text}</p>
               </div>
-              <button class="note-popup-close" onClick={() => setActiveNoteId(null)} aria-label="Close">
+              <button class="note-popup-close" onClick={() => setActiveNoteId(null)} aria-label={i18n('reader.ariaCloseNote')}>
                 <CloseIcon />
               </button>
             </div>

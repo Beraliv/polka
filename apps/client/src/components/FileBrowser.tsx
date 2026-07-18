@@ -1,6 +1,7 @@
 import { createSignal, For, Show, onMount } from 'solid-js';
 import type { SMBConfig, FileEntry } from '@polka/shared';
 import { listSMBFiles } from '../lib/api';
+import { i18n } from '../i18n';
 
 type Props = {
   config: SMBConfig;
@@ -10,8 +11,8 @@ type Props = {
 
 function formatSize(bytes?: number): string {
   if (!bytes) return '';
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024) return i18n('fileBrowser.sizeKilobytes', { kilobytes: (bytes / 1024).toFixed(0) });
+  return i18n('fileBrowser.sizeMegabytes', { megabytes: (bytes / (1024 * 1024)).toFixed(1) });
 }
 
 export function FileBrowser(props: Props) {
@@ -64,10 +65,10 @@ export function FileBrowser(props: Props) {
       <div class="modal">
         <div class="modal-header">
           <Show when={currentPath()}>
-            <button class="icon-btn" onClick={goUp} title="Go up">←</button>
+            <button class="icon-btn" onClick={goUp} title={i18n('fileBrowser.goUpTooltip')}>←</button>
           </Show>
           <span class="modal-title">{currentPath() || '/'}</span>
-          <button class="icon-btn" onClick={props.onClose} title="Close">✕</button>
+          <button class="icon-btn" onClick={props.onClose} title={i18n('fileBrowser.closeTooltip')}>✕</button>
         </div>
 
         <Show when={loading()}>

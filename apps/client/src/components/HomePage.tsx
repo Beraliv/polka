@@ -10,6 +10,7 @@ import { BookFilesDB } from '../lib/polka-db.ts';
 import { BookCard } from './BookCard.tsx';
 import { FileBrowser } from './FileBrowser.tsx';
 import type { Book, BookFormat } from '@polka/shared';
+import { i18n } from '../i18n';
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -76,7 +77,7 @@ export function HomePage() {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
     if (!/\.(epub|fb2)$/i.test(file.name)) {
-      setAddError('Only EPUB and FB2 files are supported');
+      setAddError(i18n('home.unsupportedFormatError'));
       return;
     }
     setAdding(true);
@@ -128,13 +129,13 @@ export function HomePage() {
 
   async function reopenBook(bookId: string) {
     if (!store.smb) {
-      setAddError('No SMB configuration found. Add your NAS credentials using "Browser NAS" and re-open this book to continue reading');
+      setAddError(i18n('home.missingSmbConfigError'));
       return;
     }
 
     const progress = loadProgress(bookId);
     if (!progress?.smbPath) {
-      setAddError('Re-open this book using "+" or "Browse NAS" to continue reading');
+      setAddError(i18n('home.missingSmbPathError'));
       return;
     }
 
@@ -155,8 +156,8 @@ export function HomePage() {
   return (
     <div class="page">
       <div class="page-header">
-        <h1 class="page-title">Polka</h1>
-        <A href="/settings" class="icon-btn" title="Settings">
+        <h1 class="page-title">{i18n('home.appTitle')}</h1>
+        <A href="/settings" class="icon-btn" title={i18n('home.settingsTooltip')}>
           <SettingsIcon />
         </A>
       </div>
@@ -172,13 +173,13 @@ export function HomePage() {
       <Show when={store.books.length === 0 && !adding()}>
         <div class="empty-state">
           <div class="empty-state-icon">📚</div>
-          <p class="empty-state-text">No books yet — tap + to add one</p>
+          <p class="empty-state-text">{i18n('home.emptyStateText')}</p>
         </div>
       </Show>
 
       <Show when={activeBooks().length > 0}>
         <div class="shelf">
-          <div class="shelf-heading">Reading</div>
+          <div class="shelf-heading">{i18n('home.readingShelfHeading')}</div>
           <For each={activeBooks()}>
             {(book) => (
               <BookCard
@@ -197,7 +198,7 @@ export function HomePage() {
 
       <Show when={finishedBooks().length > 0}>
         <div class="shelf" style={{ 'margin-top': '16px' }}>
-          <div class="shelf-heading">Finished</div>
+          <div class="shelf-heading">{i18n('home.finishedShelfHeading')}</div>
           <For each={finishedBooks()}>
             {(book) => (
               <BookCard
@@ -225,7 +226,7 @@ export function HomePage() {
       <div class="fab-area">
         <Show when={store.smb}>
           <button class="smb-btn" onClick={() => setShowBrowser(true)}>
-            Browse NAS
+            {i18n('home.browseNasButton')}
           </button>
         </Show>
         <button
@@ -233,7 +234,7 @@ export function HomePage() {
           onClick={() => fileInput.click()}
           disabled={adding()}
         >
-          {adding() ? '…' : 'Browse files'}
+          {adding() ? '…' : i18n('home.browseFilesButton')}
         </button>
       </div>
 

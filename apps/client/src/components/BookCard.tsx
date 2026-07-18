@@ -1,5 +1,6 @@
 import { Show } from 'solid-js';
 import type { Book, Progress } from '@polka/shared';
+import { i18n } from '../i18n';
 
 type Props = {
   book: Book;
@@ -29,7 +30,7 @@ export function BookCard(props: Props) {
     <div
       class={`book-card${props.available ? '' : ' unavailable'}${props.loading ? ' loading' : ''}`}
       onClick={handleClick}
-      title={props.available ? undefined : 'Tap to re-download from NAS'}
+      title={props.available ? undefined : i18n('bookCard.redownloadTooltip')}
     >
       <div class="book-cover-placeholder">
         <span class="book-format-badge">{props.book.format}</span>
@@ -43,7 +44,7 @@ export function BookCard(props: Props) {
           when={props.progress}
           fallback={
             <Show when={props.book.totalPages > 0}>
-              <div class="progress-text">{props.book.totalPages} pages</div>
+              <div class="progress-text">{i18n('bookCard.totalPages', { totalPages: props.book.totalPages })}</div>
             </Show>
           }
         >
@@ -54,14 +55,17 @@ export function BookCard(props: Props) {
               </div>
               <div class="progress-text">
                 {p().finished
-                  ? 'Finished'
-                  : `Page ${p().currentPage} of ${p().totalPages}`}
+                  ? i18n('bookCard.finished')
+                  : i18n('bookCard.pageOfTotal', {
+                      currentPage: p().currentPage,
+                      totalPages: p().totalPages,
+                    })}
               </div>
             </>
           )}
         </Show>
       </div>
-      <button class="remove-btn" onClick={handleRemove} title="Remove">✕</button>
+      <button class="remove-btn" onClick={handleRemove} title={i18n('bookCard.removeTooltip')}>✕</button>
     </div>
   );
 }

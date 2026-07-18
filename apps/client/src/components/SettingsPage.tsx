@@ -4,6 +4,7 @@ import { HeartIcon } from './HeartIcon.tsx';
 import { store, BookStore } from '../store/books.ts';
 import { testSMB, fetchServerVersion } from '../lib/api';
 import type { SMBConfig } from '@polka/shared';
+import { i18n } from '../i18n';
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -40,7 +41,7 @@ export function SettingsPage() {
     try {
       await testSMB({ config: buildConfig(), serverUrl: serverUrl().trim().replace(/\/+$/, '') });
       setStatus('ok');
-      setStatusMsg('Connection successful');
+      setStatusMsg(i18n('settings.connectionSuccessful'));
     } catch (e) {
       setStatus('error');
       setStatusMsg(e instanceof Error ? e.message : String(e));
@@ -72,68 +73,68 @@ export function SettingsPage() {
   return (
     <div class="page">
       <div class="page-header">
-        <button class="icon-btn" onClick={() => navigate('/')} title="Back">←</button>
-        <h1 class="page-title">NAS Settings</h1>
+        <button class="icon-btn" onClick={() => navigate('/')} title={i18n('settings.backTooltip')}>←</button>
+        <h1 class="page-title">{i18n('settings.title')}</h1>
         <div style={{ width: '40px' }} />
       </div>
 
       <div class="settings-form">
         <div class="field">
-          <label>Server URL</label>
+          <label>{i18n('settings.serverUrlLabel')}</label>
           <input
             type="url"
             inputmode="url"
-            placeholder="http://100.111.45.19:3001"
+            placeholder={i18n('settings.serverUrlPlaceholder')}
             value={serverUrl()}
             onInput={(e) => setServerUrl(e.currentTarget.value)}
           />
-          <p class="field-hint">Address of your self-hosted Polka server. Leave blank when the app is served from the same server.</p>
+          <p class="field-hint">{i18n('settings.serverUrlHint')}</p>
         </div>
         <div class="field">
-          <label>IP Address</label>
+          <label>{i18n('settings.ipAddressLabel')}</label>
           <input
             type="text"
             inputmode="url"
-            placeholder="192.168.1.100"
+            placeholder={i18n('settings.ipAddressPlaceholder')}
             value={ip()}
             onInput={(e) => setIp(e.currentTarget.value)}
           />
         </div>
         <div class="field">
-          <label>Port</label>
+          <label>{i18n('settings.portLabel')}</label>
           <input
             type="number"
             inputmode="numeric"
-            placeholder="445"
+            placeholder={i18n('settings.portPlaceholder')}
             value={port()}
             onInput={(e) => setPort(e.currentTarget.value)}
           />
         </div>
         <div class="field">
-          <label>Username</label>
+          <label>{i18n('settings.usernameLabel')}</label>
           <input
             type="text"
             autocomplete="username"
-            placeholder="username"
+            placeholder={i18n('settings.usernamePlaceholder')}
             value={username()}
             onInput={(e) => setUsername(e.currentTarget.value)}
           />
         </div>
         <div class="field">
-          <label>Password</label>
+          <label>{i18n('settings.passwordLabel')}</label>
           <input
             type="password"
             autocomplete="current-password"
-            placeholder={existing ? '(re-enter to update)' : 'password'}
+            placeholder={existing ? i18n('settings.passwordUpdatePlaceholder') : i18n('settings.passwordPlaceholder')}
             value={password()}
             onInput={(e) => setPassword(e.currentTarget.value)}
           />
         </div>
         <div class="field">
-          <label>Share Name</label>
+          <label>{i18n('settings.shareNameLabel')}</label>
           <input
             type="text"
-            placeholder="books"
+            placeholder={i18n('settings.shareNamePlaceholder')}
             value={share()}
             onInput={(e) => setShare(e.currentTarget.value)}
           />
@@ -147,20 +148,20 @@ export function SettingsPage() {
 
         <div class="settings-actions">
           <button class="btn-secondary" onClick={() => void handleTest()} disabled={busy()}>
-            {busy() ? 'Testing…' : 'Test Connection'}
+            {busy() ? i18n('settings.testingButton') : i18n('settings.testConnectionButton')}
           </button>
-          <button class="btn" onClick={handleSave}>Save</button>
+          <button class="btn" onClick={handleSave}>{i18n('settings.saveButton')}</button>
           <Show when={existing}>
-            <button class="btn-danger" onClick={handleClear}>Disconnect NAS</button>
+            <button class="btn-danger" onClick={handleClear}>{i18n('settings.disconnectNasButton')}</button>
           </Show>
         </div>
 
         <p class="app-version">
-          Polka client v{__APP_VERSION__}
-          {serverVersion() ? ` · server v${serverVersion()}` : ''}
+          {i18n('settings.clientVersion', { version: __APP_VERSION__ })}
+          {serverVersion() ? ' · ' + i18n('settings.serverVersion', { version: serverVersion()! }) : ''}
         </p>
         <p class="app-credit">
-          developed with <HeartIcon /> by Alexey
+          {i18n('settings.developedWith')} <HeartIcon /> {i18n('settings.developedBy')}
         </p>
         <p class="app-credit">
           <a
@@ -169,7 +170,7 @@ export function SettingsPage() {
             target="_blank"
             rel="noopener noreferrer"
           >
-            GitHub
+            {i18n('settings.githubLinkLabel')}
           </a>
         </p>
       </div>

@@ -52,7 +52,7 @@ export const en = {
     title: 'NAS Settings',
     backTooltip: 'Back',
     serverUrlLabel: 'Server URL',
-    serverUrlPlaceholder: 'http://100.111.45.19:3001',
+    serverUrlPlaceholder: 'http://192.168.1.100:3000',
     serverUrlHint:
       'Address of your self-hosted Polka server. Leave blank when the app is served from the same server.',
     ipAddressLabel: 'IP Address',

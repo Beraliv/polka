@@ -22,6 +22,12 @@ html, body, #app {
   height: 100%;
 }
 
+html {
+  /* Prevent mobile browsers from re-inflating text on rotation. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
@@ -462,7 +468,8 @@ h5.reader-section-title { font-size: 0.9rem; }
   cursor: zoom-in;
 }
 
-@media (min-width: 900px) {
+/* Height guard keeps landscape phones (~400px tall) out of the desktop layout. */
+@media (min-width: 900px) and (min-height: 500px) {
   .reader-content {
     padding: 32px 64px;
     font-size: 1.1rem;

@@ -23,6 +23,7 @@ import {
 import type { SectionItem, Page, Paragraph, NoteRef, Note, BookImageAsset, TextStyle } from '../lib/book';
 import type { Progress } from '@polka/shared';
 import { i18n } from '../i18n';
+import { debounce } from '../lib/debounce.ts';
 
 // Internal token for pagination: words (optionally styled) or atomic note references.
 type Token = { text: string; style?: TextStyle } | NoteRef;
@@ -308,6 +309,10 @@ function progressFraction(progress: Progress | null): number {
 // mirroring the reader's page-turn tap detection.
 const TAP_MOVE_TOLERANCE_PX = 10;
 
+// Long enough to outlast a resize burst from a live window drag, short enough
+// that the reader doesn't feel stuck on the loading spinner.
+const RESIZE_DEBOUNCE_MS = 150;
+
 type ReaderImageProps = {
   src: string | undefined;
   height: number;
@@ -424,7 +429,8 @@ export function ReaderPage() {
 
   const book = () => store.books.find((candidate) => candidate.id === bookId);
 
-  const desktopMediaQuery = window.matchMedia('(min-width: 900px)');
+  // Must be synced with `@media` query in styles.css
+  const desktopMediaQuery = window.matchMedia('(min-width: 900px) and (min-height: 500px)');
   const [isTwoPageView, setIsTwoPageView] = createSignal(desktopMediaQuery.matches);
   const [pageIdx, setPageIdx] = createSignal(0);
   const [localPages, setLocalPages] = createSignal<Page[]>([]);
@@ -482,7 +488,11 @@ export function ReaderPage() {
     setSeeking(false);
   }
 
-  function repaginate(restoreFraction: number) {
+  // Expensive operation (it measures every paragraph), so the debounce is
+  // baked in: no call site can trigger back-to-back rebuilds. A burst of
+  // calls collapses into one rebuild RESIZE_DEBOUNCE_MS after the last one,
+  // which also gives layout time to settle before measuring.
+  const repaginate = debounce((restoreFraction: number) => {
     if (!pageEl) return;
     const sections = store.sections[bookId];
     if (!sections?.length) return;
@@ -495,7 +505,7 @@ export function ReaderPage() {
       setPageIdx(clampPageIndex(restoredIndex, built.length));
       setReady(true);
     });
-  }
+  }, RESIZE_DEBOUNCE_MS);
 
   function nextPage() {
     setPageIdx((current) => clampPageIndex(current + pageStep(), localPages().length));
@@ -576,14 +586,20 @@ export function ReaderPage() {
     document.addEventListener('keydown', handleKey);
     onCleanup(() => document.removeEventListener('keydown', handleKey));
 
+    // Drag or rotation may fire a burst of resize events (e.g. on macOS, but
+    // not on iOS/iPadOS); repaginate is debounced, so the burst collapses
+    // into a single rebuild.
     const handleResize = () => {
       const currentFraction =
         localPages().length > 1 ? pageIdx() / (localPages().length - 1) : 0;
       batch(() => setReady(false));
-      requestAnimationFrame(() => repaginate(currentFraction));
+      repaginate(currentFraction);
     };
     window.addEventListener('resize', handleResize);
-    onCleanup(() => window.removeEventListener('resize', handleResize));
+    onCleanup(() => {
+      repaginate.cancel();
+      window.removeEventListener('resize', handleResize);
+    });
 
     // Repagination itself is driven by the resize handler above; this only flips the layout mode.
     const handleDesktopMediaChange = (event: MediaQueryListEvent) => {

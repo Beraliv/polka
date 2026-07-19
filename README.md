@@ -8,7 +8,7 @@ A mobile-first e-book reader for EPUB and FB2 files, designed to run on TrueNAS.
 <details>
 <summary>Screenshots</summary>
 
-<img src="docs/screenshots/HomePage-0.8.5.png" alt="Empty library" width="245"> <img src="docs/screenshots/HomePageWithFiles-0.9.0.png" alt="Library with FB2 and EPUB books in progress" width="245"> <img src="docs/screenshots/HomePageWithNasNavigation-0.9.0.png" alt="NAS file browser sheet over the library" width="245"> <img src="docs/screenshots/SettingsPage-1-0.8.5.png" alt="NAS settings: connection form" width="245"> <img src="docs/screenshots/SettingsPage-2-0.8.5.png" alt="NAS settings: versions, credit and GitHub link" width="245"> <img src="docs/screenshots/ReaderPage-epub-0.6.0.png" alt="Reader with an EPUB book" width="245"> <img src="docs/screenshots/ReaderPage-fb2-0.6.0.png" alt="Reader with an FB2 book" width="245"> <img src="docs/screenshots/ReaderPageWithFootnote-fb2-0.6.0.png" alt="Reader with an FB2 footnote popup" width="245">
+<img src="docs/screenshots/HomePage-0.8.5.png" alt="Empty library" width="245"> <img src="docs/screenshots/HomePageWithFiles-0.10.0.png" alt="Library with FB2 and EPUB books in progress" width="245"> <img src="docs/screenshots/HomePageWithNasNavigation-0.10.0.png" alt="NAS file browser sheet over the library" width="245"> <img src="docs/screenshots/SettingsPage-1-0.8.5.png" alt="NAS settings: connection form" width="245"> <img src="docs/screenshots/SettingsPage-2-0.8.5.png" alt="NAS settings: versions, credit and GitHub link" width="245"> <img src="docs/screenshots/ReaderPage-epub-0.10.0.png" alt="Reader with an EPUB book" width="245"> <img src="docs/screenshots/ReaderPage-fb2-0.10.0.png" alt="Reader with an FB2 book" width="245"> <img src="docs/screenshots/ReaderPageWithFootnote-fb2-0.10.0.png" alt="Reader with an FB2 footnote popup" width="245">
 
 </details>
 
@@ -20,6 +20,7 @@ A mobile-first e-book reader for EPUB and FB2 files, designed to run on TrueNAS.
 - **Books persist across reloads** — stored in IndexedDB, no re-download needed
 - **Progress sync** — saved to IndexedDB and optionally synced to the server
 - **Mobile-first** — swipe left/right to turn pages; keyboard arrows and spacebar also work
+- **Reader navigation** — jump to any chapter from the table of contents, or scrub to a page with the progress slider
 - **Two-page spread on desktop** — wide screens (≥900px) show two pages side by side, like an open book
 - **Page-based rendering** — only the current page is in the DOM, so even large books stay fast
 - **Full-screen images** — tap a book illustration to view it full screen; close with the X button or Escape

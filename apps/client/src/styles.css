@@ -348,26 +348,7 @@ a {
   color: var(--text-muted);
   white-space: nowrap;
   flex-shrink: 0;
-  cursor: pointer;
   user-select: none;
-}
-
-.reader-page-info:hover {
-  color: var(--text);
-}
-
-.reader-page-input {
-  width: 80px;
-  background: var(--surface);
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  padding: 2px 6px;
-  color: var(--text);
-  font-family: inherit;
-  font-size: 0.8rem;
-  text-align: center;
-  outline: none;
-  flex-shrink: 0;
 }
 
 .reader-content {
@@ -499,24 +480,142 @@ h5.reader-section-title { font-size: 0.9rem; }
   gap: 4px;
 }
 
-.reader-progress-bar {
-  height: 3px;
-  background: var(--surface2);
-  border-radius: 2px;
-  overflow: hidden;
+/* A native range input styled as the progress bar: the filled part of the
+   track is painted with a two-stop gradient driven by --progress-percent. */
+.reader-progress-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 14px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
-.reader-progress-fill {
-  height: 100%;
-  background: var(--accent);
+.reader-progress-slider::-webkit-slider-runnable-track {
+  height: 4px;
   border-radius: 2px;
-  transition: width 0.3s;
+  background: linear-gradient(
+    to right,
+    var(--accent) var(--progress-percent),
+    var(--surface2) var(--progress-percent)
+  );
+}
+
+.reader-progress-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.reader-progress-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface2);
+}
+
+.reader-progress-slider::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.reader-progress-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
 }
 
 .reader-percent {
   font-size: 0.75rem;
   color: var(--text-muted);
   text-align: center;
+}
+
+/* ---- Table of contents sheet ---- */
+
+.toc-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 400;
+}
+
+.toc-sheet {
+  background: var(--surface);
+  border-radius: var(--radius) var(--radius) 0 0;
+  width: 100%;
+  max-width: 600px;
+  max-height: 70vh;
+  padding: 12px 0 calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.toc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem 8px;
+}
+
+.toc-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+}
+
+.toc-entry {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.95rem;
+  text-align: start;
+  padding: 10px 1rem;
+  cursor: pointer;
+}
+
+.toc-entry:hover {
+  background: var(--surface2);
+}
+
+.toc-entry.active {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.toc-entry-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toc-entry-page {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 /* ---- Footnote references & popup ---- */

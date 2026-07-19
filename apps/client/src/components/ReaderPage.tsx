@@ -4,6 +4,7 @@ import { useNavigate, useParams } from '@solidjs/router';
 import { ChevronLeftIcon } from './ChevronLeftIcon.tsx';
 import { ChevronRightIcon } from './ChevronRightIcon.tsx';
 import { CloseIcon } from './CloseIcon.tsx';
+import { TocIcon } from './TocIcon.tsx';
 import { store, setStore, BookStore } from '../store/books.ts';
 import { loadProgress, loadRemoteProgress, saveProgress } from '../lib/progress.ts';
 import { BookFilesDB } from '../lib/polka-db.ts';
@@ -151,10 +152,19 @@ type BuildPagesOptions = {
   imageAssets: Record<string, BookImageAsset>;
 };
 
-function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Page[] {
+type BuiltPagination = {
+  pages: Page[];
+  // For every section, the index of the page it starts on — pages never span
+  // sections, so each section begins a fresh page. Drives the table of contents.
+  sectionStartPageIndexes: number[];
+};
+
+function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): BuiltPagination {
   const availableHeight = pageEl.clientHeight;
   const availableWidth = pageEl.clientWidth;
-  if (availableHeight <= 0 || availableWidth <= 0 || sections.length === 0) return [];
+  if (availableHeight <= 0 || availableWidth <= 0 || sections.length === 0) {
+    return { pages: [], sectionStartPageIndexes: [] };
+  }
 
   // Mirror the real page element's computed styles so measurements are accurate
   const computedStyle = window.getComputedStyle(pageEl);
@@ -183,6 +193,7 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Page[
     availableHeight - parseFloat(computedStyle.paddingTop) - parseFloat(computedStyle.paddingBottom);
 
   const pages: Page[] = [];
+  const sectionStartPageIndexes: number[] = [];
 
   const flush = (current: Page) => {
     pages.push(current);
@@ -190,6 +201,7 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Page[
   };
 
   for (const section of sections) {
+    sectionStartPageIndexes.push(pages.length);
     container.innerHTML = '';
     let current: Page = [];
 
@@ -293,7 +305,7 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Page[
   }
 
   document.body.removeChild(container);
-  return pages;
+  return { pages, sectionStartPageIndexes };
 }
 
 /**
@@ -434,16 +446,15 @@ export function ReaderPage() {
   const [isTwoPageView, setIsTwoPageView] = createSignal(desktopMediaQuery.matches);
   const [pageIdx, setPageIdx] = createSignal(0);
   const [localPages, setLocalPages] = createSignal<Page[]>([]);
+  const [sectionStartPageIndexes, setSectionStartPageIndexes] = createSignal<number[]>([]);
   const [ready, setReady] = createSignal(false);
-  const [seeking, setSeeking] = createSignal(false);
-  const [seekValue, setSeekValue] = createSignal('');
+  const [tocOpen, setTocOpen] = createSignal(false);
   const [activeNoteId, setActiveNoteId] = createSignal<string | null>(null);
   const [fullscreenImageId, setFullscreenImageId] = createSignal<string | null>(null);
   const [imageAssets, setImageAssets] = createSignal<Record<string, BookImageAsset>>({});
   let smbPath: string | undefined;
   let contentEl: HTMLDivElement | undefined;
   let pageEl: HTMLDivElement | undefined;
-  let seekInputEl: HTMLInputElement | undefined;
   let touchStartX = 0;
   let touchStartY = 0;
 
@@ -468,24 +479,53 @@ export function ReaderPage() {
     return imageAssets()[id] ?? null;
   };
 
-  function openSeek() {
-    setSeekValue(String(pageIdx() + 1));
-    setSeeking(true);
-    requestAnimationFrame(() => seekInputEl?.select());
+  type TocEntry = { title: string; level: number; pageIndex: number };
+
+  // Titled sections paired with the page they start on. Untitled sections
+  // (e.g. front matter without a heading) carry no useful label, so they are
+  // left out of the table of contents.
+  const tocEntries = (): TocEntry[] => {
+    const sections = store.sections[bookId] ?? [];
+    const startPageIndexes = sectionStartPageIndexes();
+    const entries: TocEntry[] = [];
+    sections.forEach((section, sectionIndex) => {
+      const pageIndex = startPageIndexes[sectionIndex];
+      if (!section.title || pageIndex === undefined) return;
+      const level = Math.min(Math.max(section.level ?? 1, 1), 5);
+      entries.push({ title: section.title, level, pageIndex });
+    });
+    return entries;
+  };
+
+  // Index into tocEntries() of the chapter the reader is currently in: the
+  // last entry that starts on or before the currently visible pages.
+  const activeTocEntryIndex = (): number => {
+    const lastVisiblePageIndex = pageIdx() + pageStep() - 1;
+    let activeIndex = -1;
+    tocEntries().forEach((entry, entryIndex) => {
+      if (entry.pageIndex <= lastVisiblePageIndex) activeIndex = entryIndex;
+    });
+    return activeIndex;
+  };
+
+  function jumpToTocEntry(entry: TocEntry) {
+    setPageIdx(clampPageIndex(entry.pageIndex, total()));
+    scrollToTop();
+    setTocOpen(false);
   }
 
-  function commitSeek() {
-    if (!seeking()) return;
-    const requestedPageNumber = parseInt(seekValue(), 10);
-    if (!isNaN(requestedPageNumber)) {
-      setPageIdx(clampPageIndex(requestedPageNumber - 1, total()));
-      scrollToTop();
-    }
-    setSeeking(false);
+  function openToc() {
+    setTocOpen(true);
+    // The sheet opens scrolled to the top; bring the current chapter into view.
+    requestAnimationFrame(() => {
+      document.querySelector('.toc-entry.active')?.scrollIntoView({ block: 'center' });
+    });
   }
 
-  function cancelSeek() {
-    setSeeking(false);
+  function seekToPageNumber(pageNumber: number) {
+    if (Number.isNaN(pageNumber)) return;
+    setPageIdx(clampPageIndex(pageNumber - 1, total()));
+    scrollToTop();
   }
 
   // Expensive operation (it measures every paragraph), so the debounce is
@@ -498,11 +538,12 @@ export function ReaderPage() {
     if (!sections?.length) return;
 
     const built = buildPages({ pageEl, sections, imageAssets: imageAssets() });
-    BookStore.updateTotalPages(bookId, built.length);
+    BookStore.updateTotalPages(bookId, built.pages.length);
     batch(() => {
-      setLocalPages(built);
-      const restoredIndex = Math.round(restoreFraction * Math.max(0, built.length - 1));
-      setPageIdx(clampPageIndex(restoredIndex, built.length));
+      setLocalPages(built.pages);
+      setSectionStartPageIndexes(built.sectionStartPageIndexes);
+      const restoredIndex = Math.round(restoreFraction * Math.max(0, built.pages.length - 1));
+      setPageIdx(clampPageIndex(restoredIndex, built.pages.length));
       setReady(true);
     });
   }, RESIZE_DEBOUNCE_MS);
@@ -569,17 +610,17 @@ export function ReaderPage() {
 
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
-        if (activeNoteId() || fullscreenImageId()) return;
+        if (activeNoteId() || fullscreenImageId() || tocOpen()) return;
         event.preventDefault();
         nextPage();
       } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
-        if (activeNoteId() || fullscreenImageId()) return;
+        if (activeNoteId() || fullscreenImageId() || tocOpen()) return;
         event.preventDefault();
         prevPage();
       } else if (event.key === 'Escape') {
         if (fullscreenImageId()) setFullscreenImageId(null);
         else if (activeNoteId()) setActiveNoteId(null);
-        else if (seeking()) cancelSeek();
+        else if (tocOpen()) setTocOpen(false);
         else navigate('/');
       }
     };
@@ -668,27 +709,18 @@ export function ReaderPage() {
           <ChevronLeftIcon />
         </button>
         <span class="reader-book-title">{book()?.name ?? ''}</span>
-        <Show when={seeking()} fallback={
-          <span class="reader-page-info" onClick={openSeek} title={i18n('reader.goToPageTooltip')}>
-            {pageRangeLabel()} / {total()}
-          </span>
-        }>
-          <input
-            ref={seekInputEl}
-            class="reader-page-input"
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            value={seekValue()}
-            onInput={(event) => setSeekValue(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              event.stopPropagation();
-              if (event.key === 'Enter') { event.preventDefault(); commitSeek(); }
-              else if (event.key === 'Escape') { event.preventDefault(); cancelSeek(); }
-            }}
-            onBlur={commitSeek}
-          />
-        </Show>
+        <span class="reader-page-info">
+          {pageRangeLabel()} / {total()}
+        </span>
+        <button
+          class="icon-btn"
+          onClick={openToc}
+          disabled={tocEntries().length === 0}
+          title={i18n('reader.tocTooltip')}
+          aria-label={i18n('reader.tocTooltip')}
+        >
+          <TocIcon />
+        </button>
       </div>
 
       <div
@@ -746,12 +778,53 @@ export function ReaderPage() {
 
       <div class="reader-footer">
         <div class="reader-progress-wrap">
-          <div class="reader-progress-bar">
-            <div class="reader-progress-fill" style={{ width: `${percent()}%` }} />
-          </div>
+          <input
+            class="reader-progress-slider"
+            type="range"
+            min="1"
+            max={Math.max(1, total())}
+            value={pageIdx() + 1}
+            style={{ '--progress-percent': `${percent()}%` }}
+            onInput={(event) => seekToPageNumber(event.currentTarget.valueAsNumber)}
+            aria-label={i18n('reader.pageSliderLabel')}
+          />
           <div class="reader-percent">{percent()}%</div>
         </div>
       </div>
+
+      <Show when={tocOpen()}>
+        <div class="toc-overlay" onClick={() => setTocOpen(false)}>
+          <div class="toc-sheet" onClick={(event) => event.stopPropagation()}>
+            <div class="toc-header">
+              <h2 class="toc-title">{i18n('reader.tocTitle')}</h2>
+              <button
+                class="icon-btn"
+                onClick={() => setTocOpen(false)}
+                title={i18n('reader.closeTooltip')}
+                aria-label={i18n('reader.ariaCloseToc')}
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <ul class="toc-list">
+              <For each={tocEntries()}>
+                {(entry, entryIndex) => (
+                  <li>
+                    <button
+                      class={`toc-entry${entryIndex() === activeTocEntryIndex() ? ' active' : ''}`}
+                      style={{ 'padding-inline-start': `${entry.level * 16}px` }}
+                      onClick={() => jumpToTocEntry(entry)}
+                    >
+                      <span class="toc-entry-title">{entry.title}</span>
+                      <span class="toc-entry-page">{entry.pageIndex + 1}</span>
+                    </button>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </div>
+        </div>
+      </Show>
 
       <Show when={fullscreenImage()} keyed>
         {(image) => (

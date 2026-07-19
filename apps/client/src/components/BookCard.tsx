@@ -14,8 +14,8 @@ type Props = {
 };
 
 export function BookCard(props: Props) {
-  function handleRemove(e: MouseEvent) {
-    e.stopPropagation();
+  function handleRemove(event: MouseEvent) {
+    event.stopPropagation();
     props.onRemove();
   }
 

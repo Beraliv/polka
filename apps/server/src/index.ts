@@ -32,7 +32,7 @@ const app = (
 ) as FastifyInstance;
 
 const allowedOrigins = process.env.ALLOWED_ORIGIN
-  ? process.env.ALLOWED_ORIGIN.split(',').map((s) => s.trim())
+  ? process.env.ALLOWED_ORIGIN.split(',').map((origin) => origin.trim())
   : [];
 
 await app.register(cors, {

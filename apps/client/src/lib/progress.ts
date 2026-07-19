@@ -26,7 +26,7 @@ export async function initProgress(): Promise<void> {
       await ProgressDB.upload(progress);
       progressCache[progress.bookId] = progress;
     }
-    for (const key of migrated.map((p) => LEGACY_PREFIX + p.bookId)) {
+    for (const key of migrated.map((progressEntry) => LEGACY_PREFIX + progressEntry.bookId)) {
       localStorage.removeItem(key);
     }
   } else {

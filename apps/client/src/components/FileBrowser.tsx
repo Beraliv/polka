@@ -32,14 +32,14 @@ export function FileBrowser(props: Props) {
     try {
       const files = await listSMBFiles(props.config, path);
       setEntries(
-        [...files].sort((a, b) => {
-          if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
-          return a.name.localeCompare(b.name);
+        [...files].sort((first, second) => {
+          if (first.isDirectory !== second.isDirectory) return first.isDirectory ? -1 : 1;
+          return first.name.localeCompare(second.name);
         })
       );
       setCurrentPath(path);
-    } catch (e) {
-      setError(String(e));
+    } catch (error) {
+      setError(String(error));
     } finally {
       setLoading(false);
     }
@@ -56,13 +56,13 @@ export function FileBrowser(props: Props) {
   }
 
   function goUp() {
-    const p = currentPath();
-    const idx = Math.max(p.lastIndexOf('\\'), p.lastIndexOf('/'));
-    void loadDir(idx > 0 ? p.slice(0, idx) : '');
+    const path = currentPath();
+    const separatorIndex = Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/'));
+    void loadDir(separatorIndex > 0 ? path.slice(0, separatorIndex) : '');
   }
 
-  function handleOverlayClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) props.onClose();
+  function handleOverlayClick(event: MouseEvent) {
+    if (event.target === event.currentTarget) props.onClose();
   }
 
   return (

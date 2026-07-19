@@ -16,8 +16,8 @@ function getTitle(section: Element): string | undefined {
   const titleEl = section.querySelector(':scope > title');
   if (!titleEl) return undefined;
   const parts: string[] = [];
-  titleEl.querySelectorAll('p').forEach((p) => {
-    const text = p.textContent?.trim();
+  titleEl.querySelectorAll('p').forEach((paragraphEl) => {
+    const text = paragraphEl.textContent?.trim();
     if (text) parts.push(text);
   });
   return parts.join(' ') || undefined;

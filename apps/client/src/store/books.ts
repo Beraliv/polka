@@ -38,14 +38,14 @@ type AddBookOptions = {
 
 export class BookStore {
   static async uploadBook({ book, sections, notes, images, arrayBuffer }: AddBookOptions): Promise<void> {
-    setStore('books', (prev) => {
-      const next = [book, ...prev.filter((b) => b.id !== book.id)];
+    setStore('books', (previousBooks) => {
+      const nextBooks = [book, ...previousBooks.filter((storedBook) => storedBook.id !== book.id)];
       try {
-        localStorage.setItem(BOOKS_KEY, JSON.stringify(next));
+        localStorage.setItem(BOOKS_KEY, JSON.stringify(nextBooks));
       } catch (error) {
         console.error(`[uploadBook] Failed to upload book ${book.id} to local storage:`, error);
       }
-      return next;
+      return nextBooks;
     });
     setStore('sections', book.id, sections);
     if (notes) {
@@ -61,26 +61,26 @@ export class BookStore {
   }
 
   static updateTotalPages(id: string, totalPages: number): void {
-    setStore('books', (prev) => {
-      const next = prev.map((b) => (b.id === id ? { ...b, totalPages } : b));
+    setStore('books', (previousBooks) => {
+      const nextBooks = previousBooks.map((storedBook) => (storedBook.id === id ? { ...storedBook, totalPages } : storedBook));
       try {
-        localStorage.setItem(BOOKS_KEY, JSON.stringify(next));
+        localStorage.setItem(BOOKS_KEY, JSON.stringify(nextBooks));
       } catch (error) {
         console.error(`[updateTotalPages] Failed to update total pages for book ${id} in local storage:`, error);
       }
-      return next;
+      return nextBooks;
     });
   }
 
   static async deleteBook(id: string): Promise<void> {
-    setStore('books', (prev) => {
-      const next = prev.filter((b) => b.id !== id);
+    setStore('books', (previousBooks) => {
+      const nextBooks = previousBooks.filter((storedBook) => storedBook.id !== id);
       try {
-        localStorage.setItem(BOOKS_KEY, JSON.stringify(next));
+        localStorage.setItem(BOOKS_KEY, JSON.stringify(nextBooks));
       } catch (error) {
         console.error(`[deleteBook] Failed to delete book ${id} from local storage:`, error);
       }
-      return next;
+      return nextBooks;
     });
     try {
       const [bookFilesResult, progressResult] = await Promise.allSettled([

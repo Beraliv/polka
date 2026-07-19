@@ -422,7 +422,7 @@ export function ReaderPage() {
   const navigate = useNavigate();
   const bookId = params.id;
 
-  const book = () => store.books.find((b) => b.id === bookId);
+  const book = () => store.books.find((candidate) => candidate.id === bookId);
 
   const desktopMediaQuery = window.matchMedia('(min-width: 900px)');
   const [isTwoPageView, setIsTwoPageView] = createSignal(desktopMediaQuery.matches);
@@ -470,9 +470,9 @@ export function ReaderPage() {
 
   function commitSeek() {
     if (!seeking()) return;
-    const n = parseInt(seekValue(), 10);
-    if (!isNaN(n)) {
-      setPageIdx(clampPageIndex(n - 1, total()));
+    const requestedPageNumber = parseInt(seekValue(), 10);
+    if (!isNaN(requestedPageNumber)) {
+      setPageIdx(clampPageIndex(requestedPageNumber - 1, total()));
       scrollToTop();
     }
     setSeeking(false);
@@ -557,16 +557,16 @@ export function ReaderPage() {
 
     void init();
 
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
         if (activeNoteId() || fullscreenImageId()) return;
-        e.preventDefault();
+        event.preventDefault();
         nextPage();
-      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
         if (activeNoteId() || fullscreenImageId()) return;
-        e.preventDefault();
+        event.preventDefault();
         prevPage();
-      } else if (e.key === 'Escape') {
+      } else if (event.key === 'Escape') {
         if (fullscreenImageId()) setFullscreenImageId(null);
         else if (activeNoteId()) setActiveNoteId(null);
         else if (seeking()) cancelSeek();
@@ -595,15 +595,15 @@ export function ReaderPage() {
 
   createEffect(() => {
     if (!ready()) return;
-    const idx = pageIdx();
-    const b = book();
+    const pageIndex = pageIdx();
+    const currentBook = book();
     const total = localPages().length;
-    if (!b || total === 0) return;
-    const lastVisiblePage = Math.min(idx + pageStep(), total);
+    if (!currentBook || total === 0) return;
+    const lastVisiblePage = Math.min(pageIndex + pageStep(), total);
     const progress: Progress = {
       bookId,
-      bookName: b.name,
-      currentPage: idx + 1,
+      bookName: currentBook.name,
+      currentPage: pageIndex + 1,
       totalPages: total,
       percent: Math.round((lastVisiblePage / total) * 100),
       lastRead: Date.now(),
@@ -613,20 +613,20 @@ export function ReaderPage() {
     saveProgress(progress);
   });
 
-  function handleContentTouchStart(e: TouchEvent) {
-    const t = e.touches[0];
-    if (t) { touchStartX = t.clientX; touchStartY = t.clientY; }
+  function handleContentTouchStart(event: TouchEvent) {
+    const touch = event.touches[0];
+    if (touch) { touchStartX = touch.clientX; touchStartY = touch.clientY; }
   }
 
-  function handleContentTouchEnd(e: TouchEvent) {
+  function handleContentTouchEnd(event: TouchEvent) {
     if (activeNoteId()) return;
-    const t = e.changedTouches[0];
-    if (!t) return;
-    if (Math.abs(t.clientX - touchStartX) > 10 || Math.abs(t.clientY - touchStartY) > 10) return;
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    if (Math.abs(touch.clientX - touchStartX) > 10 || Math.abs(touch.clientY - touchStartY) > 10) return;
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const zone = 2 * parseFloat(getComputedStyle(document.documentElement).fontSize);
-    if (t.clientX < rect.left + zone) prevPage();
-    else if (t.clientX > rect.right - zone) nextPage();
+    if (touch.clientX < rect.left + zone) prevPage();
+    else if (touch.clientX > rect.right - zone) nextPage();
   }
 
   const currentPage = () => localPages()[pageIdx()] ?? [];
@@ -664,11 +664,11 @@ export function ReaderPage() {
             inputMode="numeric"
             pattern="[0-9]*"
             value={seekValue()}
-            onInput={(e) => setSeekValue(e.currentTarget.value)}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === 'Enter') { e.preventDefault(); commitSeek(); }
-              else if (e.key === 'Escape') { e.preventDefault(); cancelSeek(); }
+            onInput={(event) => setSeekValue(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              event.stopPropagation();
+              if (event.key === 'Enter') { event.preventDefault(); commitSeek(); }
+              else if (event.key === 'Escape') { event.preventDefault(); cancelSeek(); }
             }}
             onBlur={commitSeek}
           />
@@ -761,7 +761,7 @@ export function ReaderPage() {
       <Show when={activeNote()} keyed>
         {(note) => (
           <div class="note-popup-overlay" onClick={() => setActiveNoteId(null)}>
-            <div class="note-popup" onClick={(e) => e.stopPropagation()}>
+            <div class="note-popup" onClick={(event) => event.stopPropagation()}>
               <div class="note-popup-content">
                 <Show when={note.title}>
                   <h2 class="note-popup-title">{note.title}</h2>

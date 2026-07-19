@@ -27,9 +27,9 @@ export function HomePage() {
   onMount(() => {
     void (async () => {
       const available = new Set<string>();
-      await Promise.all(store.books.map(async (b) => {
-        if (await BookFilesDB.has(b.id)) {
-          available.add(b.id);
+      await Promise.all(store.books.map(async (book) => {
+        if (await BookFilesDB.has(book.id)) {
+          available.add(book.id);
         }
       }));
       setIdbBookIds(available);
@@ -38,28 +38,28 @@ export function HomePage() {
 
   const progressMap = createMemo(() => {
     const map: Record<string, ReturnType<typeof allProgress>[number]> = {};
-    for (const p of allProgress()) map[p.bookId] = p;
+    for (const progressEntry of allProgress()) map[progressEntry.bookId] = progressEntry;
     return map;
   });
 
   const activeBooks = createMemo(() =>
-    store.books.filter((b) => !progressMap()[b.id]?.finished)
+    store.books.filter((book) => !progressMap()[book.id]?.finished)
   );
 
   const finishedBooks = createMemo(() =>
-    store.books.filter((b) => !!progressMap()[b.id]?.finished)
+    store.books.filter((book) => !!progressMap()[book.id]?.finished)
   );
 
   function processBook(buffer: ArrayBuffer, filename: string): string {
-    const ext = filename.split('.').pop()?.toLowerCase() as BookFormat;
+    const extension = filename.split('.').pop()?.toLowerCase() as BookFormat;
     const bookId = computeBookId(buffer);
-    const parsed = parseBook({ buffer, format: ext });
+    const parsed = parseBook({ buffer, format: extension });
     const book: Book = {
       id: bookId,
       name: parsed.title || filename,
       author: parsed.author,
       lang: parsed.lang,
-      format: ext,
+      format: extension,
       totalPages: 0,
       addedAt: Date.now(),
     };
@@ -74,8 +74,8 @@ export function HomePage() {
     return bookId;
   }
 
-  async function handleFileChange(e: Event) {
-    const file = (e.target as HTMLInputElement).files?.[0];
+  async function handleFileChange(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
     if (!/\.(epub|fb2)$/i.test(file.name)) {
       setAddError(i18n('home.unsupportedFormatError'));
@@ -87,8 +87,8 @@ export function HomePage() {
       const buffer = await file.arrayBuffer();
       const bookId = processBook(buffer, file.name);
       navigate(`/reader/${bookId}`);
-    } catch (e) {
-      setAddError(e instanceof Error ? e.message : String(e));
+    } catch (error) {
+      setAddError(error instanceof Error ? error.message : String(error));
     } finally {
       setAdding(false);
       fileInput.value = '';
@@ -104,20 +104,20 @@ export function HomePage() {
       const buffer = await downloadSMBFile(store.smb, path);
       const bookId = processBook(buffer, filename);
       // Persist SMB path so re-download is possible after reload
-      const prev = loadProgress(bookId);
+      const previousProgress = loadProgress(bookId);
       saveProgress({
         bookId,
-        bookName: prev?.bookName ?? filename,
-        currentPage: prev?.currentPage ?? 0,
-        totalPages: prev?.totalPages ?? 0,
-        percent: prev?.percent ?? 0,
-        lastRead: prev?.lastRead ?? Date.now(),
-        finished: prev?.finished ?? false,
+        bookName: previousProgress?.bookName ?? filename,
+        currentPage: previousProgress?.currentPage ?? 0,
+        totalPages: previousProgress?.totalPages ?? 0,
+        percent: previousProgress?.percent ?? 0,
+        lastRead: previousProgress?.lastRead ?? Date.now(),
+        finished: previousProgress?.finished ?? false,
         smbPath: path,
       });
       navigate(`/reader/${bookId}`);
-    } catch (e) {
-      setAddError(e instanceof Error ? e.message : String(e));
+    } catch (error) {
+      setAddError(error instanceof Error ? error.message : String(error));
     } finally {
       setAdding(false);
     }
@@ -152,8 +152,8 @@ export function HomePage() {
       const buffer = await downloadSMBFile(store.smb, progress.smbPath);
       processBook(buffer, filename);
       navigate(`/reader/${bookId}`);
-    } catch (e) {
-      setAddError(e instanceof Error ? e.message : String(e));
+    } catch (error) {
+      setAddError(error instanceof Error ? error.message : String(error));
     } finally {
       setReopeningId(null);
     }
@@ -236,7 +236,7 @@ export function HomePage() {
         type="file"
         accept=".epub,.fb2"
         style={{ display: 'none' }}
-        onChange={(e) => void handleFileChange(e)}
+        onChange={(event) => void handleFileChange(event)}
       />
 
       <div class="fab-area">

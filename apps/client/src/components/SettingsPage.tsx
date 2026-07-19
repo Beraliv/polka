@@ -24,7 +24,7 @@ export function SettingsPage() {
   const [share, setShare] = createSignal(existing?.share ?? '');
   const [busy, setBusy] = createSignal(false);
   const [status, setStatus] = createSignal<'idle' | 'ok' | 'error'>('idle');
-  const [statusMsg, setStatusMsg] = createSignal('');
+  const [statusMessage, setStatusMessage] = createSignal('');
 
   function buildConfig(): SMBConfig {
     return {
@@ -42,10 +42,10 @@ export function SettingsPage() {
     try {
       await testSMB({ config: buildConfig(), serverUrl: serverUrl().trim().replace(/\/+$/, '') });
       setStatus('ok');
-      setStatusMsg(i18n('settings.connectionSuccessful'));
-    } catch (e) {
+      setStatusMessage(i18n('settings.connectionSuccessful'));
+    } catch (error) {
       setStatus('error');
-      setStatusMsg(e instanceof Error ? e.message : String(e));
+      setStatusMessage(error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(false);
     }
@@ -94,7 +94,7 @@ export function SettingsPage() {
             inputmode="url"
             placeholder={i18n('settings.serverUrlPlaceholder')}
             value={serverUrl()}
-            onInput={(e) => setServerUrl(e.currentTarget.value)}
+            onInput={(event) => setServerUrl(event.currentTarget.value)}
           />
           <p class="field-hint">{i18n('settings.serverUrlHint')}</p>
         </div>
@@ -105,7 +105,7 @@ export function SettingsPage() {
             inputmode="url"
             placeholder={i18n('settings.ipAddressPlaceholder')}
             value={ip()}
-            onInput={(e) => setIp(e.currentTarget.value)}
+            onInput={(event) => setIp(event.currentTarget.value)}
           />
         </div>
         <div class="field">
@@ -115,7 +115,7 @@ export function SettingsPage() {
             inputmode="numeric"
             placeholder={i18n('settings.portPlaceholder')}
             value={port()}
-            onInput={(e) => setPort(e.currentTarget.value)}
+            onInput={(event) => setPort(event.currentTarget.value)}
           />
         </div>
         <div class="field">
@@ -125,7 +125,7 @@ export function SettingsPage() {
             autocomplete="username"
             placeholder={i18n('settings.usernamePlaceholder')}
             value={username()}
-            onInput={(e) => setUsername(e.currentTarget.value)}
+            onInput={(event) => setUsername(event.currentTarget.value)}
           />
         </div>
         <div class="field">
@@ -135,7 +135,7 @@ export function SettingsPage() {
             autocomplete="current-password"
             placeholder={existing ? i18n('settings.passwordUpdatePlaceholder') : i18n('settings.passwordPlaceholder')}
             value={password()}
-            onInput={(e) => setPassword(e.currentTarget.value)}
+            onInput={(event) => setPassword(event.currentTarget.value)}
           />
         </div>
         <div class="field">
@@ -144,13 +144,13 @@ export function SettingsPage() {
             type="text"
             placeholder={i18n('settings.shareNamePlaceholder')}
             value={share()}
-            onInput={(e) => setShare(e.currentTarget.value)}
+            onInput={(event) => setShare(event.currentTarget.value)}
           />
         </div>
 
         <Show when={status() !== 'idle'}>
           <div class={`status-msg ${status() === 'ok' ? 'status-ok' : 'status-error'}`}>
-            {statusMsg()}
+            {statusMessage()}
           </div>
         </Show>
 

@@ -1,6 +1,7 @@
 import { Show } from 'solid-js';
 import type { Book, Progress } from '@polka/shared';
 import { i18n } from '../i18n';
+import { CloseIcon } from './CloseIcon.tsx';
 
 type Props = {
   book: Book;
@@ -48,24 +49,31 @@ export function BookCard(props: Props) {
             </Show>
           }
         >
-          {(p) => (
+          {(bookProgress) => (
             <>
               <div class="progress-bar">
-                <div class="progress-fill" style={{ width: `${p().percent}%` }} />
+                <div class="progress-fill" style={{ width: `${bookProgress().percent}%` }} />
               </div>
               <div class="progress-text">
-                {p().finished
+                {bookProgress().finished
                   ? i18n('bookCard.finished')
                   : i18n('bookCard.pageOfTotal', {
-                      currentPage: p().currentPage,
-                      totalPages: p().totalPages,
+                      currentPage: bookProgress().currentPage,
+                      totalPages: bookProgress().totalPages,
                     })}
               </div>
             </>
           )}
         </Show>
       </div>
-      <button class="remove-btn" onClick={handleRemove} title={i18n('bookCard.removeTooltip')}>✕</button>
+      <button
+        class="remove-btn"
+        onClick={handleRemove}
+        title={i18n('bookCard.removeTooltip')}
+        aria-label={i18n('bookCard.removeTooltip')}
+      >
+        <CloseIcon />
+      </button>
     </div>
   );
 }

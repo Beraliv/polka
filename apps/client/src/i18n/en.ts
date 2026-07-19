@@ -13,15 +13,15 @@ export const en = {
   home: {
     appTitle: 'Polka',
     settingsTooltip: 'Settings',
-    emptyStateText: 'No books yet — tap + to add one',
+    emptyStateText: 'No books yet — tap "$addFromDevice" or "$addFromNas" to add one',
     readingShelfHeading: 'Reading',
     finishedShelfHeading: 'Finished',
-    browseNasButton: 'Browse NAS',
-    browseFilesButton: 'Browse files',
+    addFromNasButton: 'Add from NAS',
+    addFromDeviceButton: 'Add from device',
     unsupportedFormatError: 'Only EPUB and FB2 files are supported',
     missingSmbConfigError:
-      'No SMB configuration found. Add your NAS credentials using "Browser NAS" and re-open this book to continue reading',
-    missingSmbPathError: 'Re-open this book using "+" or "Browse NAS" to continue reading',
+      'No SMB configuration found. Add your NAS credentials in Settings and re-open this book to continue reading',
+    missingSmbPathError: 'Re-open this book using "$addFromDevice" or "$addFromNas" to continue reading',
   },
   bookCard: {
     redownloadTooltip: 'Tap to re-download from NAS',
@@ -46,7 +46,7 @@ export const en = {
     nextPage: 'Next page',
     closeTooltip: 'Close',
     ariaCloseFullscreenImage: 'Close full screen image',
-    ariaCloseNote: 'Close',
+    ariaCloseNote: 'Close footnote',
   },
   settings: {
     title: 'NAS Settings',

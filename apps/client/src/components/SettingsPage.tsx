@@ -1,5 +1,6 @@
 import { createSignal, onMount, Show } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
+import { ChevronLeftIcon } from './ChevronLeftIcon.tsx';
 import { HeartIcon } from './HeartIcon.tsx';
 import { store, BookStore } from '../store/books.ts';
 import { testSMB, fetchServerVersion } from '../lib/api';
@@ -73,7 +74,14 @@ export function SettingsPage() {
   return (
     <div class="page">
       <div class="page-header">
-        <button class="icon-btn" onClick={() => navigate('/')} title={i18n('settings.backTooltip')}>←</button>
+        <button
+          class="icon-btn"
+          onClick={() => navigate('/')}
+          title={i18n('settings.backTooltip')}
+          aria-label={i18n('settings.backTooltip')}
+        >
+          <ChevronLeftIcon />
+        </button>
         <h1 class="page-title">{i18n('settings.title')}</h1>
         <div style={{ width: '40px' }} />
       </div>

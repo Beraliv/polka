@@ -643,7 +643,14 @@ export function ReaderPage() {
   return (
     <div class="reader">
       <div class="reader-header">
-        <button class="icon-btn" onClick={() => navigate('/')} title={i18n('reader.backTooltip')}>←</button>
+        <button
+          class="icon-btn"
+          onClick={() => navigate('/')}
+          title={i18n('reader.backTooltip')}
+          aria-label={i18n('reader.backTooltip')}
+        >
+          <ChevronLeftIcon />
+        </button>
         <span class="reader-book-title">{book()?.name ?? ''}</span>
         <Show when={seeking()} fallback={
           <span class="reader-page-info" onClick={openSeek} title={i18n('reader.goToPageTooltip')}>

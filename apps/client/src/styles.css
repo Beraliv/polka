@@ -237,7 +237,7 @@ a {
 }
 
 .empty-state-icon {
-  font-size: 3rem;
+  color: var(--text-muted);
   margin-bottom: 12px;
 }
 
@@ -828,7 +828,8 @@ h5.reader-section-title { font-size: 0.9rem; }
 }
 
 .file-icon {
-  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
   flex-shrink: 0;
 }
 

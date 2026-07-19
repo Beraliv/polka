@@ -1,5 +1,6 @@
 import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
 import { A, useNavigate } from '@solidjs/router';
+import { LibraryIcon } from './LibraryIcon.tsx';
 import { SettingsIcon } from './SettingsIcon.tsx';
 import { store, BookStore } from '../store/books.ts';
 import { allProgress } from '../lib/progress.ts';
@@ -135,7 +136,12 @@ export function HomePage() {
 
     const progress = loadProgress(bookId);
     if (!progress?.smbPath) {
-      setAddError(i18n('home.missingSmbPathError'));
+      setAddError(
+        i18n('home.missingSmbPathError', {
+          addFromDevice: i18n('home.addFromDeviceButton'),
+          addFromNas: i18n('home.addFromNasButton'),
+        }),
+      );
       return;
     }
 
@@ -157,7 +163,12 @@ export function HomePage() {
     <div class="page">
       <div class="page-header">
         <h1 class="page-title">{i18n('home.appTitle')}</h1>
-        <A href="/settings" class="icon-btn" title={i18n('home.settingsTooltip')}>
+        <A
+          href="/settings"
+          class="icon-btn"
+          title={i18n('home.settingsTooltip')}
+          aria-label={i18n('home.settingsTooltip')}
+        >
           <SettingsIcon />
         </A>
       </div>
@@ -172,8 +183,13 @@ export function HomePage() {
 
       <Show when={store.books.length === 0 && !adding()}>
         <div class="empty-state">
-          <div class="empty-state-icon">📚</div>
-          <p class="empty-state-text">{i18n('home.emptyStateText')}</p>
+          <div class="empty-state-icon"><LibraryIcon /></div>
+          <p class="empty-state-text">
+            {i18n('home.emptyStateText', {
+              addFromDevice: i18n('home.addFromDeviceButton'),
+              addFromNas: i18n('home.addFromNasButton'),
+            })}
+          </p>
         </div>
       </Show>
 
@@ -226,7 +242,7 @@ export function HomePage() {
       <div class="fab-area">
         <Show when={store.smb}>
           <button class="smb-btn" onClick={() => setShowBrowser(true)}>
-            {i18n('home.browseNasButton')}
+            {i18n('home.addFromNasButton')}
           </button>
         </Show>
         <button
@@ -234,7 +250,7 @@ export function HomePage() {
           onClick={() => fileInput.click()}
           disabled={adding()}
         >
-          {adding() ? '…' : i18n('home.browseFilesButton')}
+          {adding() ? '…' : i18n('home.addFromDeviceButton')}
         </button>
       </div>
 

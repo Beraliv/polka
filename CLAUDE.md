@@ -22,7 +22,7 @@
 
 ## UI
 
-- **Icons must be SVG, not ASCII/Unicode symbols.** When adding icon-like UI elements (close/X button, add/+ button, arrows, chevrons, etc.), use an inline SVG icon instead of text characters like `×`, `+`, `✕`, `→`, or `⚙`. Text glyphs render inconsistently across platforms and fonts; SVGs are crisp, stylable, and alignable.
+- **Icons must be SVG, not ASCII/Unicode symbols or emojis.** When adding icon-like UI elements (close/X button, add/+ button, arrows, chevrons, file/folder markers, decorative illustrations, etc.), use an inline SVG icon instead of text characters like `×`, `+`, `✕`, `→`, or `⚙`, or emojis like `📁`, `📖`, or `📚`. Text glyphs and emojis render inconsistently across platforms and fonts; SVGs are crisp, stylable, and alignable.
 
 ## Documentation
 

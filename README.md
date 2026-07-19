@@ -41,7 +41,7 @@ pnpm install
 pnpm dev                            # client → http://localhost:3000  server → http://localhost:3001
 ```
 
-Open `http://localhost:3000`, tap **+** to open a local `.epub` or `.fb2` file.
+Open `http://localhost:3000`, tap **Add from device** to open a local `.epub` or `.fb2` file.
 
 ## NAS / TrueNAS deployment
 
@@ -79,7 +79,7 @@ The app opens full-screen without browser chrome. Books and progress are stored 
 1. Open the app and go to **Settings (⚙)**
 2. Enter your NAS IP, port (default 445), username, password, and share name
 3. Tap **Test Connection** to verify, then **Save**
-4. Back on the home screen, tap **Browse NAS** to pick a book
+4. Back on the home screen, tap **Add from NAS** to pick a book
 
 The password is saved to localStorage so the NAS reconnects automatically on reload. Books downloaded from the NAS are cached in IndexedDB and reopen instantly without re-downloading.
 

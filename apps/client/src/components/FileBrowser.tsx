@@ -1,6 +1,11 @@
 import { createSignal, For, Show, onMount } from 'solid-js';
 import type { SMBConfig, FileEntry } from '@polka/shared';
 import { listSMBFiles } from '../lib/api';
+import { BookIcon } from './BookIcon.tsx';
+import { ChevronLeftIcon } from './ChevronLeftIcon.tsx';
+import { CloseIcon } from './CloseIcon.tsx';
+import { DocumentIcon } from './DocumentIcon.tsx';
+import { FolderIcon } from './FolderIcon.tsx';
 import { i18n } from '../i18n';
 
 type Props = {
@@ -65,10 +70,24 @@ export function FileBrowser(props: Props) {
       <div class="modal">
         <div class="modal-header">
           <Show when={currentPath()}>
-            <button class="icon-btn" onClick={goUp} title={i18n('fileBrowser.goUpTooltip')}>←</button>
+            <button
+              class="icon-btn"
+              onClick={goUp}
+              title={i18n('fileBrowser.goUpTooltip')}
+              aria-label={i18n('fileBrowser.goUpTooltip')}
+            >
+              <ChevronLeftIcon />
+            </button>
           </Show>
           <span class="modal-title">{currentPath() || '/'}</span>
-          <button class="icon-btn" onClick={props.onClose} title={i18n('fileBrowser.closeTooltip')}>✕</button>
+          <button
+            class="icon-btn"
+            onClick={props.onClose}
+            title={i18n('fileBrowser.closeTooltip')}
+            aria-label={i18n('fileBrowser.closeTooltip')}
+          >
+            <CloseIcon />
+          </button>
         </div>
 
         <Show when={loading()}>
@@ -83,7 +102,7 @@ export function FileBrowser(props: Props) {
           <For each={entries()}>
             {(entry) => {
               const isBook = !entry.isDirectory && /\.(epub|fb2)$/i.test(entry.name);
-              const icon = entry.isDirectory ? '📁' : isBook ? '📖' : '📄';
+              const EntryIcon = entry.isDirectory ? FolderIcon : isBook ? BookIcon : DocumentIcon;
               const dimmed = !entry.isDirectory && !isBook;
               return (
                 <div
@@ -91,7 +110,7 @@ export function FileBrowser(props: Props) {
                   style={dimmed ? { opacity: '0.35', cursor: 'default' } : {}}
                   onClick={() => handleEntry(entry)}
                 >
-                  <span class="file-icon">{icon}</span>
+                  <span class="file-icon"><EntryIcon /></span>
                   <span class="file-name">{entry.name}</span>
                   <Show when={entry.size}>
                     <span class="file-size">{formatSize(entry.size)}</span>

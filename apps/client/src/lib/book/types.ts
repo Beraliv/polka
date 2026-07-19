@@ -65,6 +65,8 @@ export type ParsedBook = {
   notes: Record<string, Note>;
   // Data URLs keyed by image id, referenced from BookImage paragraphs.
   images: Record<string, string>;
+  // Key into `images` of the book's cover image, when the format declares one.
+  coverImageId?: string;
 };
 
 // page elements

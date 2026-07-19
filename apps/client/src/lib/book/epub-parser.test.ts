@@ -71,6 +71,33 @@ function buildTestEpub(): ArrayBuffer {
   return zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength) as ArrayBuffer;
 }
 
+// 1×1 transparent PNG, enough for cover-extraction assertions.
+const COVER_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+function coverPngBytes(): Uint8Array {
+  return Uint8Array.from(atob(COVER_PNG_BASE64), (character) => character.charCodeAt(0));
+}
+
+type BuildEpubWithCoverOptions = { manifestItem: string; metadataExtra?: string };
+
+// Rebuilds the test EPUB with a cover.png plus the given manifest/metadata
+// declarations, covering both the EPUB 3 and EPUB 2 cover conventions.
+function buildEpubWithCover({ manifestItem, metadataExtra }: BuildEpubWithCoverOptions): ArrayBuffer {
+  const opf = CONTENT_OPF
+    .replace('</metadata>', `${metadataExtra ?? ''}</metadata>`)
+    .replace('<manifest>', `<manifest>${manifestItem}`);
+  const zipped = zipSync({
+    'META-INF/container.xml': strToU8(CONTAINER_XML),
+    'OEBPS/content.opf': strToU8(opf),
+    'OEBPS/chapter1.xhtml': strToU8(CHAPTER1_XHTML),
+    'OEBPS/notes.xhtml': strToU8(NOTES_XHTML),
+    'OEBPS/toc.xhtml': strToU8(TOC_XHTML),
+    'OEBPS/cover.png': coverPngBytes(),
+  });
+  return zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength) as ArrayBuffer;
+}
+
 function contentParagraphs(parsed: ReturnType<typeof parseEPUB>): Paragraph[] {
   return parsed.sections.flatMap((section) =>
     section.paragraphs.filter((paragraph): paragraph is Paragraph => Array.isArray(paragraph)),
@@ -158,5 +185,37 @@ describe('parseEPUB', () => {
     const texts = contentParagraphs(parsed).map(paragraphText);
     expect(texts.join(' ')).not.toContain('Inline footnote body.');
     expect(texts.join(' ')).not.toContain('Endnote body.');
+  });
+
+  it('extracts the cover from an EPUB 3 properties="cover-image" manifest item', () => {
+    const parsed = parseEPUB(buildEpubWithCover({
+      manifestItem: '<item id="cover-img" href="cover.png" media-type="image/png" properties="cover-image"/>',
+    }));
+    expect(parsed.coverImageId).toBe('cover-img');
+    expect(parsed.images['cover-img']).toBe(`data:image/png;base64,${COVER_PNG_BASE64}`);
+  });
+
+  it('extracts the cover from an EPUB 2 meta name="cover" reference', () => {
+    const parsed = parseEPUB(buildEpubWithCover({
+      manifestItem: '<item id="cover-img" href="cover.png" media-type="image/png"/>',
+      metadataExtra: '<meta name="cover" content="cover-img"/>',
+    }));
+    expect(parsed.coverImageId).toBe('cover-img');
+    expect(parsed.images['cover-img']).toBe(`data:image/png;base64,${COVER_PNG_BASE64}`);
+  });
+
+  it('returns no cover when the OPF declares none', () => {
+    const parsed = parseEPUB(buildTestEpub());
+    expect(parsed.coverImageId).toBeUndefined();
+    expect(parsed.images).toEqual({});
+  });
+
+  it('survives a malformed meta name="cover" reference instead of aborting the parse', () => {
+    const parsed = parseEPUB(buildEpubWithCover({
+      manifestItem: '<item id="cover-img" href="cover.png" media-type="image/png"/>',
+      metadataExtra: '<meta name="cover" content="bad&quot;quote\\backslash"/>',
+    }));
+    expect(parsed.title).toBe('Test Book');
+    expect(parsed.coverImageId).toBeUndefined();
   });
 });

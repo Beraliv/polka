@@ -8,6 +8,10 @@ export type Book = {
   format: BookFormat;
   totalPages: number;
   addedAt: number;
+  /**
+   * Small JPEG thumbnail of the book cover as a data URL, when the file has one.
+   */
+  cover?: string;
 };
 
 export type Progress = {

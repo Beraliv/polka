@@ -205,6 +205,15 @@ function parseBinaryImages(doc: Document): Record<string, string> {
   return images;
 }
 
+type ParseCoverImageIdOptions = { doc: Document; images: Record<string, string> };
+
+function parseCoverImageId({ doc, images }: ParseCoverImageIdOptions): string | undefined {
+  const coverImageEl = doc.querySelector('description coverpage > image');
+  if (!coverImageEl) return undefined;
+  const coverImageId = linkedResourceId(coverImageEl);
+  return coverImageId && images[coverImageId] ? coverImageId : undefined;
+}
+
 export function parseFB2(buffer: ArrayBuffer): ParsedBook {
   const xml = new TextDecoder('utf-8').decode(buffer);
   const doc = new DOMParser().parseFromString(xml, 'application/xml');
@@ -221,6 +230,7 @@ export function parseFB2(buffer: ArrayBuffer): ParsedBook {
 
   const notes = parseNotes(doc);
   const images = parseBinaryImages(doc);
+  const coverImageId = parseCoverImageId({ doc, images });
 
   const sections: SectionItem[] = [];
 
@@ -241,5 +251,5 @@ export function parseFB2(buffer: ArrayBuffer): ParsedBook {
     }
   });
 
-  return { title, author, lang, sections, notes, images };
+  return { title, author, lang, sections, notes, images, coverImageId };
 }

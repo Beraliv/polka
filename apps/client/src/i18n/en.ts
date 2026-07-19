@@ -26,6 +26,7 @@ export const en = {
   bookCard: {
     redownloadTooltip: 'Tap to re-download from NAS',
     removeTooltip: 'Remove',
+    coverAlt: 'Cover of $bookName',
     finished: 'Finished',
     pageOfTotal: 'Page $currentPage of $totalPages',
     totalPages: '$totalPages pages',

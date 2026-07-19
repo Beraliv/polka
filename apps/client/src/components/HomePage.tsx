@@ -4,7 +4,7 @@ import { LibraryIcon } from './LibraryIcon.tsx';
 import { SettingsIcon } from './SettingsIcon.tsx';
 import { store, BookStore } from '../store/books.ts';
 import { allProgress } from '../lib/progress.ts';
-import { parseBook, computeBookId } from '../lib/book';
+import { parseBook, computeBookId, createCoverThumbnail } from '../lib/book';
 import { downloadSMBFile } from '../lib/api';
 import { loadProgress, saveProgress } from '../lib/progress.ts';
 import { BookFilesDB } from '../lib/polka-db.ts';
@@ -50,10 +50,12 @@ export function HomePage() {
     store.books.filter((book) => !!progressMap()[book.id]?.finished)
   );
 
-  function processBook(buffer: ArrayBuffer, filename: string): string {
+  async function processBook(buffer: ArrayBuffer, filename: string): Promise<string> {
     const extension = filename.split('.').pop()?.toLowerCase() as BookFormat;
     const bookId = computeBookId(buffer);
     const parsed = parseBook({ buffer, format: extension });
+    const coverDataUrl = parsed.coverImageId ? parsed.images[parsed.coverImageId] : undefined;
+    const cover = coverDataUrl ? await createCoverThumbnail(coverDataUrl) : undefined;
     const book: Book = {
       id: bookId,
       name: parsed.title || filename,
@@ -62,6 +64,7 @@ export function HomePage() {
       format: extension,
       totalPages: 0,
       addedAt: Date.now(),
+      cover,
     };
     void BookStore.uploadBook({
       book,
@@ -85,7 +88,7 @@ export function HomePage() {
     setAddError('');
     try {
       const buffer = await file.arrayBuffer();
-      const bookId = processBook(buffer, file.name);
+      const bookId = await processBook(buffer, file.name);
       navigate(`/reader/${bookId}`);
     } catch (error) {
       setAddError(error instanceof Error ? error.message : String(error));
@@ -102,7 +105,7 @@ export function HomePage() {
     setAddError('');
     try {
       const buffer = await downloadSMBFile(store.smb, path);
-      const bookId = processBook(buffer, filename);
+      const bookId = await processBook(buffer, filename);
       // Persist SMB path so re-download is possible after reload
       const previousProgress = loadProgress(bookId);
       saveProgress({
@@ -150,7 +153,7 @@ export function HomePage() {
     try {
       const filename = progress.smbPath.split('\\').pop() ?? progress.smbPath;
       const buffer = await downloadSMBFile(store.smb, progress.smbPath);
-      processBook(buffer, filename);
+      await processBook(buffer, filename);
       navigate(`/reader/${bookId}`);
     } catch (error) {
       setAddError(error instanceof Error ? error.message : String(error));

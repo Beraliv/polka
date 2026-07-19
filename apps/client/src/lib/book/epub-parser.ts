@@ -6,6 +6,65 @@ function decode(bytes: Uint8Array): string {
   return new TextDecoder('utf-8').decode(bytes);
 }
 
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  // Chunked to stay under the engine's argument-count limit for apply().
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
+}
+
+const IMAGE_MEDIA_TYPE_BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  svg: 'image/svg+xml',
+  webp: 'image/webp',
+};
+
+type ExtractCoverImageOptions = {
+  opfDoc: Document;
+  manifest: Map<string, string>;
+  files: Record<string, Uint8Array>;
+};
+
+type CoverImage = { coverImageId: string; dataUrl: string };
+
+// Finds the cover declared in the OPF — EPUB 3 marks the manifest item with
+// properties="cover-image", EPUB 2 names its id in <meta name="cover"> — and
+// decodes that file into a data URL.
+function extractCoverImage({ opfDoc, manifest, files }: ExtractCoverImageOptions): CoverImage | undefined {
+  const epub3Item = opfDoc.querySelector('manifest > item[properties~="cover-image"]');
+  const epub2CoverId = opfDoc.querySelector('metadata > meta[name="cover"]')?.getAttribute('content');
+  // The EPUB 2 id is matched by scanning the manifest, not via a selector
+  // string: a malformed content value must not abort parsing with an invalid
+  // selector, it should just mean "no cover".
+  const coverItem =
+    epub3Item ??
+    (epub2CoverId
+      ? Array.from(opfDoc.querySelectorAll('manifest > item')).find(
+          (item) => item.getAttribute('id') === epub2CoverId,
+        )
+      : undefined);
+  if (!coverItem) return undefined;
+
+  const coverImageId = coverItem.getAttribute('id');
+  if (!coverImageId) return undefined;
+  const coverPath = manifest.get(coverImageId);
+  if (!coverPath) return undefined;
+  const coverBytes = files[coverPath];
+  if (!coverBytes) return undefined;
+
+  const extension = coverPath.split('.').pop()?.toLowerCase() ?? '';
+  const mediaType = coverItem.getAttribute('media-type') || IMAGE_MEDIA_TYPE_BY_EXTENSION[extension];
+  if (!mediaType?.startsWith('image/')) return undefined;
+
+  return { coverImageId, dataUrl: `data:${mediaType};base64,${bytesToBase64(coverBytes)}` };
+}
+
 // linear=false marks auxiliary documents (spine itemref linear="no", usually
 // endnotes): they resolve note targets but stay out of the reading flow.
 type SpineDocument = { path: string; document: Document; linear: boolean };
@@ -305,6 +364,11 @@ export function parseEPUB(buffer: ArrayBuffer): ParsedBook {
     if (section) sections.push(section);
   }
 
-  // TODO: add EPUB support for images
-  return { title, author, sections, notes: noteCollection.notes, images: {} };
+  // TODO: add EPUB support for in-text images; only the cover is extracted.
+  const coverImage = extractCoverImage({ opfDoc, manifest, files });
+  const images: Record<string, string> = coverImage
+    ? { [coverImage.coverImageId]: coverImage.dataUrl }
+    : {};
+
+  return { title, author, sections, notes: noteCollection.notes, images, coverImageId: coverImage?.coverImageId };
 }

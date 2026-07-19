@@ -33,9 +33,22 @@ export function BookCard(props: Props) {
       onClick={handleClick}
       title={props.available ? undefined : i18n('bookCard.redownloadTooltip')}
     >
-      <div class="book-cover-placeholder">
-        <span class="book-format-badge">{props.book.format}</span>
-      </div>
+      <Show
+        when={props.book.cover}
+        fallback={
+          <div class="book-cover-placeholder">
+            <span class="book-format-badge">{props.book.format}</span>
+          </div>
+        }
+      >
+        {(coverDataUrl) => (
+          <img
+            class="book-cover"
+            src={coverDataUrl()}
+            alt={i18n('bookCard.coverAlt', { bookName: props.book.name })}
+          />
+        )}
+      </Show>
       <div class="book-info">
         <div class="book-title">{props.book.name}</div>
         <Show when={props.book.author}>

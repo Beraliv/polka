@@ -150,6 +150,15 @@ a {
   flex-shrink: 0;
 }
 
+.book-cover {
+  width: 52px;
+  height: 72px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--surface2);
+}
+
 .book-format-badge {
   font-size: 0.6rem;
   font-weight: 700;

@@ -8,7 +8,7 @@ A mobile-first e-book reader for EPUB and FB2 files, designed to run on TrueNAS.
 <details>
 <summary>Screenshots</summary>
 
-<img src="docs/HomePage-0.5.0.png" alt="Empty library" width="245"> <img src="docs/HomePageWithFiles-0.5.5.png" alt="Library with FB2 and EPUB books in progress" width="245"> <img src="docs/HomePageWithNasNavigation-0.5.0.png" alt="NAS file browser sheet over the library" width="245"> <img src="docs/SettingsPage-1-0.5.0.png" alt="NAS settings: connection form" width="245"> <img src="docs/SettingsPage-2-0.5.0.png" alt="NAS settings: versions, credit and GitHub link" width="245"> <img src="docs/ReaderPage-epub-0.6.0.png" alt="Reader with an EPUB book" width="245"> <img src="docs/ReaderPage-fb2-0.6.0.png" alt="Reader with an FB2 book" width="245"> <img src="docs/ReaderPageWithFootnote-fb2-0.6.0.png" alt="Reader with an FB2 footnote popup" width="245">
+<img src="docs/screenshots/HomePage-0.8.5.png" alt="Empty library" width="245"> <img src="docs/screenshots/HomePageWithFiles-0.8.5.png" alt="Library with FB2 and EPUB books in progress" width="245"> <img src="docs/screenshots/HomePageWithNasNavigation-0.8.5.png" alt="NAS file browser sheet over the library" width="245"> <img src="docs/screenshots/SettingsPage-1-0.8.5.png" alt="NAS settings: connection form" width="245"> <img src="docs/screenshots/SettingsPage-2-0.8.5.png" alt="NAS settings: versions, credit and GitHub link" width="245"> <img src="docs/screenshots/ReaderPage-epub-0.6.0.png" alt="Reader with an EPUB book" width="245"> <img src="docs/screenshots/ReaderPage-fb2-0.6.0.png" alt="Reader with an FB2 book" width="245"> <img src="docs/screenshots/ReaderPageWithFootnote-fb2-0.6.0.png" alt="Reader with an FB2 footnote popup" width="245">
 
 </details>
 

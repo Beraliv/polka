@@ -104,6 +104,16 @@ a {
   background: var(--surface2);
 }
 
+.icon-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.icon-btn:disabled:hover,
+.icon-btn:disabled:active {
+  background: var(--surface);
+}
+
 /* ---- BookCard ---- */
 
 .book-card {

@@ -709,13 +709,15 @@ export function ReaderPage() {
           <ChevronLeftIcon />
         </button>
         <span class="reader-book-title">{book()?.name ?? ''}</span>
-        <span class="reader-page-info">
-          {pageRangeLabel()} / {total()}
-        </span>
+        <Show when={ready()}>
+          <span class="reader-page-info">
+            {pageRangeLabel()} / {total()}
+          </span>
+        </Show>
         <button
           class="icon-btn"
           onClick={openToc}
-          disabled={tocEntries().length === 0}
+          disabled={!ready() || tocEntries().length === 0}
           title={i18n('reader.tocTooltip')}
           aria-label={i18n('reader.tocTooltip')}
         >
@@ -776,21 +778,23 @@ export function ReaderPage() {
         </div>
       </div>
 
-      <div class="reader-footer">
-        <div class="reader-progress-wrap">
-          <input
-            class="reader-progress-slider"
-            type="range"
-            min="1"
-            max={Math.max(1, total())}
-            value={pageIdx() + 1}
-            style={{ '--progress-percent': `${percent()}%` }}
-            onInput={(event) => seekToPageNumber(event.currentTarget.valueAsNumber)}
-            aria-label={i18n('reader.pageSliderLabel')}
-          />
-          <div class="reader-percent">{percent()}%</div>
+      <Show when={ready()}>
+        <div class="reader-footer">
+          <div class="reader-progress-wrap">
+            <input
+              class="reader-progress-slider"
+              type="range"
+              min="1"
+              max={Math.max(1, total())}
+              value={pageIdx() + 1}
+              style={{ '--progress-percent': `${percent()}%` }}
+              onInput={(event) => seekToPageNumber(event.currentTarget.valueAsNumber)}
+              aria-label={i18n('reader.pageSliderLabel')}
+            />
+            <div class="reader-percent">{percent()}%</div>
+          </div>
         </div>
-      </div>
+      </Show>
 
       <Show when={tocOpen()}>
         <div class="toc-overlay" onClick={() => setTocOpen(false)}>

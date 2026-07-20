@@ -8,10 +8,25 @@ import { parseBook, computeBookId, createCoverThumbnail } from '../lib/book';
 import { downloadSMBFile } from '../lib/api';
 import { loadProgress, saveProgress } from '../lib/progress.ts';
 import { BookFilesDB } from '../lib/polka-db.ts';
+import { isIOS, isIpadOS } from '../lib/platform';
 import { BookCard } from './BookCard.tsx';
 import { FileBrowser } from './FileBrowser.tsx';
 import type { Book, BookFormat } from '@polka/shared';
 import { i18n } from '../i18n';
+
+/**
+ * The filter for the file input. On affected devices we leave undefined.
+ * Set once per page load.
+ */
+const FILE_INPUT_ACCEPT = (() => {
+  if (isIOS() || isIpadOS()) {
+    // iOS/iPadOS's document picker greys out extensions with no system-registered
+    // document type (e.g. .fb2, unlike .epub) even though the browser happily
+    // reads the file once selected.
+    return undefined;
+  }
+  return ['.epub', '.fb2'].join(',');
+})();
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -237,7 +252,7 @@ export function HomePage() {
       <input
         ref={fileInput}
         type="file"
-        accept=".epub,.fb2"
+        accept={FILE_INPUT_ACCEPT}
         style={{ display: 'none' }}
         onChange={(event) => void handleFileChange(event)}
       />

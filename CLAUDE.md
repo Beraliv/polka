@@ -34,3 +34,7 @@
 ## Versioning
 
 - **Every commit that changes `apps/client` or `apps/server` must bump the `version` field in that app's `package.json`** (patch for fixes, minor for features), in the same commit. A change to `packages/shared` counts as a change to both apps.
+
+## Git
+
+- **When a commit addresses a GitHub issue, link it with `Closes #<issue-number>`** on its own line in the commit message body.

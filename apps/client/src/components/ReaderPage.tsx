@@ -25,6 +25,7 @@ import type { SectionItem, Page, Paragraph, NoteRef, Note, BookImageAsset, TextS
 import type { Progress } from '@polka/shared';
 import { i18n } from '../i18n';
 import { debounce } from '../lib/debounce.ts';
+import { noop } from '../lib/noop.ts';
 
 // Internal token for pagination: words (optionally styled) or atomic note references.
 type Token = { text: string; style?: TextStyle } | NoteRef;
@@ -778,23 +779,21 @@ export function ReaderPage() {
         </div>
       </div>
 
-      <Show when={ready()}>
-        <div class="reader-footer">
-          <div class="reader-progress-wrap">
-            <input
-              class="reader-progress-slider"
-              type="range"
-              min="1"
-              max={Math.max(1, total())}
-              value={pageIdx() + 1}
-              style={{ '--progress-percent': `${percent()}%` }}
-              onInput={(event) => seekToPageNumber(event.currentTarget.valueAsNumber)}
-              aria-label={i18n('reader.pageSliderLabel')}
-            />
-            <div class="reader-percent">{percent()}%</div>
-          </div>
+      <div class="reader-footer" style={{ visibility: ready() ? 'visible' : 'hidden' }}>
+        <div class="reader-progress-wrap">
+          <input
+            class="reader-progress-slider"
+            type="range"
+            min="1"
+            max={Math.max(1, total())}
+            value={pageIdx() + 1}
+            style={{ '--progress-percent': `${percent()}%` }}
+            onInput={ready() ? (event) => seekToPageNumber(event.currentTarget.valueAsNumber) : noop}
+            aria-label={i18n('reader.pageSliderLabel')}
+          />
+          <div class="reader-percent">{percent()}%</div>
         </div>
-      </Show>
+      </div>
 
       <Show when={tocOpen()}>
         <div class="toc-overlay" onClick={() => setTocOpen(false)}>

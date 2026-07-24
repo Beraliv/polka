@@ -98,6 +98,119 @@ function buildEpubWithCover({ manifestItem, metadataExtra }: BuildEpubWithCoverO
   return zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength) as ArrayBuffer;
 }
 
+// Three chapters with no <h1>/<h2>/<h3> at all — mirroring FB2-to-EPUB
+// converters that mark titles with <div class="titleN"> instead of real
+// headings — so any TOC entry these tests see can only have come from the
+// nav/NCX document, not from extractSectionItem's heading heuristic.
+const TOC_CHAPTER_A_XHTML = `<html>
+<head><title>A</title></head>
+<body><div class="title1"><p>Part One</p></div></body>
+</html>`;
+
+const TOC_CHAPTER_B_XHTML = `<html>
+<head><title>B</title></head>
+<body><div class="title2"><p>1</p></div><p>Body text one.</p></body>
+</html>`;
+
+const TOC_CHAPTER_C_XHTML = `<html>
+<head><title>C</title></head>
+<body><div class="title2"><p>2</p></div><p>Body text two.</p></body>
+</html>`;
+
+const TOC_TEST_FILES = {
+  'OEBPS/chapterA.xhtml': strToU8(TOC_CHAPTER_A_XHTML),
+  'OEBPS/chapterB.xhtml': strToU8(TOC_CHAPTER_B_XHTML),
+  'OEBPS/chapterC.xhtml': strToU8(TOC_CHAPTER_C_XHTML),
+};
+
+function zipToBuffer(files: Record<string, Uint8Array>): ArrayBuffer {
+  const zipped = zipSync(files);
+  return zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength) as ArrayBuffer;
+}
+
+// EPUB 2 NCX: navPoints nest to express TOC depth, "Part One" wrapping two
+// chapter-level navPoints.
+function buildEpubWithNcxToc(): ArrayBuffer {
+  const opf = `<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="uid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Toc Book</dc:title></metadata>
+  <manifest>
+    <item id="chapterA" href="chapterA.xhtml" media-type="application/xhtml+xml"/>
+    <item id="chapterB" href="chapterB.xhtml" media-type="application/xhtml+xml"/>
+    <item id="chapterC" href="chapterC.xhtml" media-type="application/xhtml+xml"/>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+  </manifest>
+  <spine toc="ncx">
+    <itemref idref="chapterA"/>
+    <itemref idref="chapterB"/>
+    <itemref idref="chapterC"/>
+  </spine>
+</package>`;
+  const ncx = `<?xml version="1.0"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+<navMap>
+<navPoint id="np1">
+<navLabel><text>Part One</text></navLabel>
+<content src="chapterA.xhtml"/>
+<navPoint id="np2">
+<navLabel><text>Chapter 1</text></navLabel>
+<content src="chapterB.xhtml"/>
+</navPoint>
+<navPoint id="np3">
+<navLabel><text>Chapter 2</text></navLabel>
+<content src="chapterC.xhtml"/>
+</navPoint>
+</navPoint>
+</navMap>
+</ncx>`;
+  return zipToBuffer({
+    'META-INF/container.xml': strToU8(CONTAINER_XML),
+    'OEBPS/content.opf': strToU8(opf),
+    'OEBPS/toc.ncx': strToU8(ncx),
+    ...TOC_TEST_FILES,
+  });
+}
+
+// EPUB 3 nav document: <ol>/<li>/<a> nesting expresses TOC depth instead.
+function buildEpubWithNavToc(): ArrayBuffer {
+  const opf = `<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Toc Book</dc:title></metadata>
+  <manifest>
+    <item id="chapterA" href="chapterA.xhtml" media-type="application/xhtml+xml"/>
+    <item id="chapterB" href="chapterB.xhtml" media-type="application/xhtml+xml"/>
+    <item id="chapterC" href="chapterC.xhtml" media-type="application/xhtml+xml"/>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+  </manifest>
+  <spine>
+    <itemref idref="chapterA"/>
+    <itemref idref="chapterB"/>
+    <itemref idref="chapterC"/>
+  </spine>
+</package>`;
+  const nav = `<html xmlns:epub="http://www.idpf.org/2007/ops">
+<head><title>Nav</title></head>
+<body>
+<nav epub:type="toc">
+<ol>
+<li><a href="chapterA.xhtml">Part One</a>
+<ol>
+<li><a href="chapterB.xhtml">Chapter 1</a></li>
+<li><a href="chapterC.xhtml">Chapter 2</a></li>
+</ol>
+</li>
+</ol>
+</nav>
+</body>
+</html>`;
+  return zipToBuffer({
+    'META-INF/container.xml': strToU8(CONTAINER_XML),
+    'OEBPS/content.opf': strToU8(opf),
+    'OEBPS/nav.xhtml': strToU8(nav),
+    ...TOC_TEST_FILES,
+  });
+}
+
 function contentParagraphs(parsed: ReturnType<typeof parseEPUB>): Paragraph[] {
   return parsed.sections.flatMap((section) =>
     section.paragraphs.filter((paragraph): paragraph is Paragraph => Array.isArray(paragraph)),
@@ -217,5 +330,80 @@ describe('parseEPUB', () => {
     }));
     expect(parsed.title).toBe('Test Book');
     expect(parsed.coverImageId).toBeUndefined();
+  });
+
+  it('parses a chapter whose <title/> is self-closed instead of empty', () => {
+    // Some EPUB producers (e.g. FB2-to-EPUB converters) emit XML-style
+    // self-closing empty elements. In HTML parsing mode <title/> isn't void,
+    // so a naive parse swallows the rest of the document — including <body>
+    // — as the title's text, leaving no content behind.
+    const selfClosingTitleChapter = CHAPTER1_XHTML.replace('<title>Chapter 1</title>', '<title/>');
+    const zipped = zipSync({
+      'META-INF/container.xml': strToU8(CONTAINER_XML),
+      'OEBPS/content.opf': strToU8(CONTENT_OPF),
+      'OEBPS/chapter1.xhtml': strToU8(selfClosingTitleChapter),
+      'OEBPS/notes.xhtml': strToU8(NOTES_XHTML),
+      'OEBPS/toc.xhtml': strToU8(TOC_XHTML),
+    });
+    const buffer = zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength) as ArrayBuffer;
+
+    const parsed = parseEPUB(buffer);
+    expect(parsed.sections).toHaveLength(1);
+    const texts = contentParagraphs(parsed).map(paragraphText);
+    expect(texts.join(' ')).toContain('Plain text with');
+  });
+
+  it('builds the TOC from an EPUB 2 NCX when sections carry no heading', () => {
+    const parsed = parseEPUB(buildEpubWithNcxToc());
+    expect(parsed.sections.every((section) => section.title === undefined)).toBe(true);
+    expect(parsed.toc).toEqual([
+      { title: 'Part One', level: 1, sectionIndex: 0 },
+      { title: 'Chapter 1', level: 2, sectionIndex: 1 },
+      { title: 'Chapter 2', level: 2, sectionIndex: 2 },
+    ]);
+  });
+
+  it('builds the TOC from an EPUB 3 nav document when sections carry no heading', () => {
+    const parsed = parseEPUB(buildEpubWithNavToc());
+    expect(parsed.sections.every((section) => section.title === undefined)).toBe(true);
+    expect(parsed.toc).toEqual([
+      { title: 'Part One', level: 1, sectionIndex: 0 },
+      { title: 'Chapter 1', level: 2, sectionIndex: 1 },
+      { title: 'Chapter 2', level: 2, sectionIndex: 2 },
+    ]);
+  });
+
+  it('falls back to heading-derived TOC entries when there is no nav or NCX document', () => {
+    const parsed = parseEPUB(buildTestEpub());
+    expect(parsed.toc).toEqual([{ title: 'Chapter 1', level: 1, sectionIndex: 0 }]);
+  });
+
+  it('resolves percent-encoded manifest hrefs against the archive\'s literal (decoded) file names', () => {
+    // Producers that emit non-ASCII file names (e.g. Adobe InDesign's EPUB
+    // export) percent-encode hrefs per the URI spec, but the zip's own entry
+    // names are the literal Unicode names — every content lookup silently
+    // failed until hrefs were decoded before matching.
+    const opf = `<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Encoded Href Book</dc:title></metadata>
+  <manifest>
+    <item id="chapter1" href="%D0%93%D0%BB%D0%B0%D0%B2%D0%B0%20%26%201.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="chapter1"/>
+  </spine>
+</package>`;
+    const chapter = `<html><head><title>Ch</title></head><body><h1>Глава</h1><p>Текст главы.</p></body></html>`;
+    const buffer = zipToBuffer({
+      'META-INF/container.xml': strToU8(CONTAINER_XML),
+      'OEBPS/content.opf': strToU8(opf),
+      'OEBPS/Глава & 1.xhtml': strToU8(chapter),
+    });
+
+    const parsed = parseEPUB(buffer);
+    expect(parsed.sections).toHaveLength(1);
+    expect(parsed.sections[0].title).toBe('Глава');
+    const texts = contentParagraphs(parsed).map(paragraphText);
+    expect(texts.join(' ')).toContain('Текст главы.');
   });
 });

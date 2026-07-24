@@ -21,7 +21,7 @@ import {
   isNoteRef,
   PageElementType,
 } from '../lib/book';
-import type { SectionItem, Page, Paragraph, NoteRef, Note, BookImageAsset, TextStyle } from '../lib/book';
+import type { SectionItem, Page, Paragraph, NoteRef, Note, BookImageAsset, TextStyle, TocEntry as ParsedTocEntry } from '../lib/book';
 import type { Progress } from '@polka/shared';
 import { i18n } from '../i18n';
 import { debounce } from '../lib/debounce.ts';
@@ -482,18 +482,19 @@ export function ReaderPage() {
 
   type TocEntry = { title: string; level: number; pageIndex: number };
 
-  // Titled sections paired with the page they start on. Untitled sections
-  // (e.g. front matter without a heading) carry no useful label, so they are
-  // left out of the table of contents.
+  // The book's TOC entries (from the EPUB nav/NCX, or derived from FB2/EPUB
+  // section headings — see parseBook) paired with the page each one starts
+  // on. Entries whose section never got paginated (still loading) are left
+  // out.
   const tocEntries = (): TocEntry[] => {
-    const sections = store.sections[bookId] ?? [];
+    const parsedEntries = store.toc[bookId] ?? [];
     const startPageIndexes = sectionStartPageIndexes();
     const entries: TocEntry[] = [];
-    sections.forEach((section, sectionIndex) => {
-      const pageIndex = startPageIndexes[sectionIndex];
-      if (!section.title || pageIndex === undefined) return;
-      const level = Math.min(Math.max(section.level ?? 1, 1), 5);
-      entries.push({ title: section.title, level, pageIndex });
+    parsedEntries.forEach((entry: ParsedTocEntry) => {
+      const pageIndex = startPageIndexes[entry.sectionIndex];
+      if (pageIndex === undefined) return;
+      const level = Math.min(Math.max(entry.level, 1), 5);
+      entries.push({ title: entry.title, level, pageIndex });
     });
     return entries;
   };
@@ -576,6 +577,7 @@ export function ReaderPage() {
         }
         const parsed = parseBook({ buffer: file.arrayBuffer, format: file.format });
         setStore('sections', bookId, parsed.sections);
+        setStore('toc', bookId, parsed.toc);
         setStore('notes', bookId, parsed.notes);
         setStore('images', bookId, parsed.images);
       }

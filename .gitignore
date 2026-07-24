@@ -6,4 +6,5 @@ dist
 coverage
 .vercel
 apps/server/data/progress/
-apps/client/src/lib/book/real-book.scratch.test.ts
+*.scratch.test.ts
+*.debug.test.ts

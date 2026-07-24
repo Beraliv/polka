@@ -1,5 +1,5 @@
 import { PageElementType, hasAnyStyle } from './types.ts';
-import type { ParsedBook, SectionItem, Paragraph, BookParagraph, NoteRef, Note, TextStyle } from './types.ts';
+import type { ParsedBook, SectionItem, TocEntry, Paragraph, BookParagraph, NoteRef, Note, TextStyle } from './types.ts';
 
 // Resolves the id referenced by an FB2 link attribute (l:href / xlink:href / href).
 function linkedResourceId(el: Element): string | undefined {
@@ -134,6 +134,17 @@ function collectDirectParagraphs(section: Element): BookParagraph[] {
   return out;
 }
 
+// FB2's <title> hierarchy already matches the section tree 1:1, so the TOC is
+// just the titled sections in order — unlike EPUB, there's no separate
+// authorial TOC document to reconcile against.
+function buildTocFromSections(sections: SectionItem[]): TocEntry[] {
+  const toc: TocEntry[] = [];
+  sections.forEach((section, sectionIndex) => {
+    if (section.title) toc.push({ title: section.title, level: section.level ?? 1, sectionIndex });
+  });
+  return toc;
+}
+
 function childSections(el: Element): Element[] {
   return Array.from(el.children).filter((childEl) => childEl.tagName.toLowerCase() === 'section');
 }
@@ -251,5 +262,7 @@ export function parseFB2(buffer: ArrayBuffer): ParsedBook {
     }
   });
 
-  return { title, author, lang, sections, notes, images, coverImageId };
+  const toc = buildTocFromSections(sections);
+
+  return { title, author, lang, sections, toc, notes, images, coverImageId };
 }

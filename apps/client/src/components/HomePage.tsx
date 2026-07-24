@@ -84,6 +84,7 @@ export function HomePage() {
     void BookStore.uploadBook({
       book,
       sections: parsed.sections,
+      toc: parsed.toc,
       notes: parsed.notes,
       images: parsed.images,
       arrayBuffer: buffer,

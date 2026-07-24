@@ -17,6 +17,7 @@ export {
 export type {
   ParsedBook,
   SectionItem,
+  TocEntry,
   BookParagraph,
   Paragraph,
   TextStyle,

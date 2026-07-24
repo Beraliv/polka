@@ -54,6 +54,15 @@ export type SectionItem =
   | { level?: number; title?: string; paragraphs: BookParagraph[] }
 
 /**
+ * One entry in the reader's table of contents: a title/level pair pointing at
+ * the section it opens. Kept separate from SectionItem.title/level because a
+ * book's authorial TOC (e.g. an EPUB's NCX/nav document) doesn't have to line
+ * up with which sections carry a heading — a section can be titled without
+ * being a TOC entry, or vice versa.
+ */
+export type TocEntry = { title: string; level: number; sectionIndex: number };
+
+/**
  * Format-independent result of parsing a book file. Parsers that have no
  * notes or images return empty records rather than omitting the fields.
  */
@@ -62,6 +71,7 @@ export type ParsedBook = {
   author?: string;
   lang?: string;
   sections: SectionItem[];
+  toc: TocEntry[];
   notes: Record<string, Note>;
   // Data URLs keyed by image id, referenced from BookImage paragraphs.
   images: Record<string, string>;

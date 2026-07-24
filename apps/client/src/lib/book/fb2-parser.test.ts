@@ -58,4 +58,9 @@ describe('parseFB2', () => {
     const parsed = parseFB2(buildTestFb2({ binaries: COVER_BINARY }));
     expect(parsed.coverImageId).toBeUndefined();
   });
+
+  it('derives TOC entries from titled sections', () => {
+    const parsed = parseFB2(buildTestFb2());
+    expect(parsed.toc).toEqual([{ title: 'Chapter 1', level: 1, sectionIndex: 0 }]);
+  });
 });

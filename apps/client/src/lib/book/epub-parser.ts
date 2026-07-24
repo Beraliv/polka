@@ -1,9 +1,36 @@
 import { unzipSync } from 'fflate';
 import { hasAnyStyle } from './types.ts';
-import type { ParsedBook, SectionItem, Paragraph, NoteRef, Note, TextStyle } from './types.ts';
+import type { ParsedBook, SectionItem, TocEntry, Paragraph, NoteRef, Note, TextStyle } from './types.ts';
 
 function decode(bytes: Uint8Array): string {
   return new TextDecoder('utf-8').decode(bytes);
+}
+
+// XHTML producers sometimes self-close elements that HTML's parser doesn't
+// treat as void, e.g. <title/>. For RCDATA/RAWTEXT elements (title, style,
+// script, textarea) that's catastrophic in 'text/html' mode: the parser
+// treats "/>" as plain text and keeps consuming everything up to the next
+// literal closing tag, swallowing the rest of the document (including
+// <body>). Rewrite them to explicit empty pairs before parsing.
+const SELF_CLOSING_RCDATA_TAG_PATTERN = /<(title|style|script|textarea)((?:\s+[^<>]*)?)\/>/gi;
+
+function fixSelfClosingRcdataTags(xhtml: string): string {
+  return xhtml.replace(SELF_CLOSING_RCDATA_TAG_PATTERN, '<$1$2></$1>');
+}
+
+// href/src attributes are URIs, so producers that emit non-ASCII or reserved
+// characters in file names (e.g. Adobe InDesign's EPUB export) percent-encode
+// them: "СССР.xhtml" becomes "%D0%A1%D0%A1%D0%A1%D0%A0.xhtml". The zip's own
+// entry names are the literal, un-encoded names, so hrefs must be decoded
+// before matching against them. A malformed percent sequence (a stray "%" in
+// an otherwise plain path) must not abort parsing — fall back to the raw
+// string, which still works for the plenty of EPUBs that never encode hrefs.
+function decodeHref(href: string): string {
+  try {
+    return decodeURIComponent(href);
+  } catch {
+    return href;
+  }
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -85,7 +112,7 @@ function splitHref({ documentPath, href }: SplitHrefOptions): HrefTarget {
     ? documentPath.slice(0, documentPath.lastIndexOf('/') + 1)
     : '';
   const segments: string[] = [];
-  for (const segment of (baseDir + rawPath).split('/')) {
+  for (const segment of (baseDir + decodeHref(rawPath)).split('/')) {
     if (segment === '' || segment === '.') continue;
     if (segment === '..') {
       segments.pop();
@@ -98,6 +125,128 @@ function splitHref({ documentPath, href }: SplitHrefOptions): HrefTarget {
 
 function getEpubType(element: Element): string {
   return element.getAttribute('epub:type')?.toLowerCase() ?? '';
+}
+
+// An unresolved TOC entry: a title/level pair pointing at an href, before
+// that href has been matched to a parsed section.
+type TocEntryDraft = { title: string; level: number; path: string; fragment?: string };
+
+function childrenNamed(element: Element, localName: string): Element[] {
+  return Array.from(element.children).filter((child) => child.localName.toLowerCase() === localName);
+}
+
+type ParseNcxTocOptions = { ncxDoc: Document; ncxPath: string };
+
+// Walks an EPUB 2 NCX <navMap>: navPoints nest to express TOC depth, each
+// carrying a <navLabel><text> and a <content src> pointing at the target
+// document (optionally with a fragment).
+function parseNcxToc({ ncxDoc, ncxPath }: ParseNcxTocOptions): TocEntryDraft[] {
+  const entries: TocEntryDraft[] = [];
+  const navMap = childrenNamed(ncxDoc.documentElement, 'navmap')[0];
+  if (!navMap) return entries;
+
+  function walk(parent: Element, level: number) {
+    for (const navPoint of childrenNamed(parent, 'navpoint')) {
+      const navLabel = childrenNamed(navPoint, 'navlabel')[0];
+      const title = navLabel ? childrenNamed(navLabel, 'text')[0]?.textContent?.trim() : undefined;
+      const src = childrenNamed(navPoint, 'content')[0]?.getAttribute('src');
+      if (title && src) {
+        const target = splitHref({ documentPath: ncxPath, href: src });
+        entries.push({ title, level, path: target.path, fragment: target.fragment });
+      }
+      walk(navPoint, level + 1);
+    }
+  }
+  walk(navMap, 1);
+  return entries;
+}
+
+type ParseNavTocOptions = { navDoc: Document; navPath: string };
+
+// Walks an EPUB 3 nav document: a <nav epub:type="toc"> wrapping a nested
+// <ol>/<li>/<a> tree, where <ol> nesting expresses TOC depth.
+function parseNavToc({ navDoc, navPath }: ParseNavTocOptions): TocEntryDraft[] {
+  const entries: TocEntryDraft[] = [];
+  const navs = Array.from(navDoc.querySelectorAll('nav'));
+  const tocNav = navs.find((nav) => getEpubType(nav).includes('toc')) ?? navs[0];
+  const rootOl = tocNav ? Array.from(tocNav.children).find((child) => child.tagName.toLowerCase() === 'ol') : undefined;
+  if (!rootOl) return entries;
+
+  function walk(ol: Element, level: number) {
+    for (const li of Array.from(ol.children).filter((child) => child.tagName.toLowerCase() === 'li')) {
+      const anchor = Array.from(li.children).find((child) => child.tagName.toLowerCase() === 'a');
+      const href = anchor?.getAttribute('href');
+      const title = anchor?.textContent?.trim();
+      if (href && title) {
+        const target = splitHref({ documentPath: navPath, href });
+        entries.push({ title, level, path: target.path, fragment: target.fragment });
+      }
+      const nestedOl = Array.from(li.children).find((child) => child.tagName.toLowerCase() === 'ol');
+      if (nestedOl) walk(nestedOl, level + 1);
+    }
+  }
+  walk(rootOl, 1);
+  return entries;
+}
+
+type ResolveTocEntriesOptions = { drafts: TocEntryDraft[]; sectionIndexByPath: Map<string, number> };
+
+// Drops entries whose target isn't a parsed section — e.g. it points at a
+// non-linear document, or a document that produced no section at all.
+// Fragments are not resolved to a position inside the section: TOC entries
+// point at whichever section their target document became.
+function resolveTocEntries({ drafts, sectionIndexByPath }: ResolveTocEntriesOptions): TocEntry[] {
+  const entries: TocEntry[] = [];
+  for (const draft of drafts) {
+    const sectionIndex = sectionIndexByPath.get(draft.path);
+    if (sectionIndex === undefined) continue;
+    entries.push({ title: draft.title, level: draft.level, sectionIndex });
+  }
+  return entries;
+}
+
+// A book with no titled headings still needs SOME table of contents, and a
+// book with a broken/absent NCX or nav document is common enough in the
+// wild. Falls back to the previous heading-derived behavior.
+function fallbackTocFromHeadings(sections: SectionItem[]): TocEntry[] {
+  const entries: TocEntry[] = [];
+  sections.forEach((section, sectionIndex) => {
+    if (section.title) entries.push({ title: section.title, level: section.level ?? 1, sectionIndex });
+  });
+  return entries;
+}
+
+type BuildTocOptions = {
+  opfDoc: Document;
+  manifest: Map<string, string>;
+  files: Record<string, Uint8Array>;
+  sections: SectionItem[];
+  sectionIndexByPath: Map<string, number>;
+};
+
+// Prefers the EPUB 3 nav document, then the EPUB 2 NCX, then falls back to
+// deriving the TOC from section headings — trying each source in turn and
+// keeping the first that resolves to at least one entry.
+function buildToc({ opfDoc, manifest, files, sections, sectionIndexByPath }: BuildTocOptions): TocEntry[] {
+  const navId = opfDoc.querySelector('manifest > item[properties~="nav"]')?.getAttribute('id');
+  const navPath = navId ? manifest.get(navId) : undefined;
+  const navBytes = navPath ? files[navPath] : undefined;
+  if (navPath && navBytes) {
+    const navDoc = new DOMParser().parseFromString(fixSelfClosingRcdataTags(decode(navBytes)), 'text/html');
+    const resolved = resolveTocEntries({ drafts: parseNavToc({ navDoc, navPath }), sectionIndexByPath });
+    if (resolved.length > 0) return resolved;
+  }
+
+  const ncxId = opfDoc.querySelector('spine')?.getAttribute('toc');
+  const ncxPath = ncxId ? manifest.get(ncxId) : undefined;
+  const ncxBytes = ncxPath ? files[ncxPath] : undefined;
+  if (ncxPath && ncxBytes) {
+    const ncxDoc = new DOMParser().parseFromString(decode(ncxBytes), 'application/xml');
+    const resolved = resolveTocEntries({ drafts: parseNcxToc({ ncxDoc, ncxPath }), sectionIndexByPath });
+    if (resolved.length > 0) return resolved;
+  }
+
+  return fallbackTocFromHeadings(sections);
 }
 
 // Marker-style labels typical of footnote references: "1", "[2]", "*", "†".
@@ -328,7 +477,7 @@ export function parseEPUB(buffer: ArrayBuffer): ParsedBook {
   opfDoc.querySelectorAll('manifest > item').forEach((item) => {
     const id = item.getAttribute('id');
     const href = item.getAttribute('href');
-    if (id && href) manifest.set(id, opfDir + href);
+    if (id && href) manifest.set(id, opfDir + decodeHref(href));
   });
 
   // Spine items in order
@@ -351,18 +500,24 @@ export function parseEPUB(buffer: ArrayBuffer): ParsedBook {
     spineDocuments.push({
       path,
       linear,
-      document: new DOMParser().parseFromString(decode(bytes), 'text/html'),
+      document: new DOMParser().parseFromString(fixSelfClosingRcdataTags(decode(bytes)), 'text/html'),
     });
   }
 
   const noteCollection = collectNotes(spineDocuments);
 
   const sections: SectionItem[] = [];
+  const sectionIndexByPath = new Map<string, number>();
   for (const spineDocument of spineDocuments) {
     if (!spineDocument.linear) continue;
     const section = extractSectionItem({ spineDocument, noteCollection });
-    if (section) sections.push(section);
+    if (section) {
+      sectionIndexByPath.set(spineDocument.path, sections.length);
+      sections.push(section);
+    }
   }
+
+  const toc = buildToc({ opfDoc, manifest, files, sections, sectionIndexByPath });
 
   // TODO: add EPUB support for in-text images; only the cover is extracted.
   const coverImage = extractCoverImage({ opfDoc, manifest, files });
@@ -370,5 +525,5 @@ export function parseEPUB(buffer: ArrayBuffer): ParsedBook {
     ? { [coverImage.coverImageId]: coverImage.dataUrl }
     : {};
 
-  return { title, author, sections, notes: noteCollection.notes, images, coverImageId: coverImage?.coverImageId };
+  return { title, author, sections, toc, notes: noteCollection.notes, images, coverImageId: coverImage?.coverImageId };
 }

@@ -1,6 +1,6 @@
 import { createStore } from 'solid-js/store';
 import type { Book, SMBConfig } from '@polka/shared';
-import type { SectionItem, Note } from '../lib/book';
+import type { SectionItem, TocEntry, Note } from '../lib/book';
 import { BookFilesDB, ProgressDB } from '../lib/polka-db.ts';
 
 const BOOKS_KEY = 'polka:books';
@@ -21,6 +21,7 @@ const [store, setStore] = createStore({
   smb: load<SMBConfig | null>(SMB_KEY, null),
   serverUrl: load<string>(SERVER_URL_KEY, ''),
   sections: {} as Record<string, SectionItem[]>,
+  toc: {} as Record<string, TocEntry[]>,
   notes: {} as Record<string, Record<string, Note>>,
   // Book image data URLs keyed by book id, then by image id.
   images: {} as Record<string, Record<string, string>>,
@@ -31,13 +32,14 @@ export { store, setStore };
 type AddBookOptions = {
   book: Book;
   sections: SectionItem[];
+  toc?: TocEntry[];
   notes?: Record<string, Note>;
   images?: Record<string, string>;
   arrayBuffer: ArrayBuffer;
 };
 
 export class BookStore {
-  static async uploadBook({ book, sections, notes, images, arrayBuffer }: AddBookOptions): Promise<void> {
+  static async uploadBook({ book, sections, toc, notes, images, arrayBuffer }: AddBookOptions): Promise<void> {
     setStore('books', (previousBooks) => {
       const nextBooks = [book, ...previousBooks.filter((storedBook) => storedBook.id !== book.id)];
       try {
@@ -48,6 +50,7 @@ export class BookStore {
       return nextBooks;
     });
     setStore('sections', book.id, sections);
+    setStore('toc', book.id, toc ?? []);
     if (notes) {
       setStore('notes', book.id, notes);
     }

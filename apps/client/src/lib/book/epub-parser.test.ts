@@ -3,8 +3,8 @@
 import { describe, expect, it } from 'vitest';
 import { strToU8, zipSync } from 'fflate';
 import { parseEPUB } from './epub-parser.ts';
-import { isNoteRef } from './types.ts';
-import type { NoteRef, Paragraph, RichText } from './types.ts';
+import { isImage, isNoteRef } from './types.ts';
+import type { BookParagraph, NoteRef, Paragraph, RichText } from './types.ts';
 
 const CONTAINER_XML = `<?xml version="1.0"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
@@ -235,6 +235,10 @@ function allNoteRefs(parsed: ReturnType<typeof parseEPUB>): NoteRef[] {
   return contentParagraphs(parsed).flatMap((paragraph) => paragraph.filter(isNoteRef));
 }
 
+function allBookParagraphs(parsed: ReturnType<typeof parseEPUB>): BookParagraph[] {
+  return parsed.sections.flatMap((section) => section.paragraphs);
+}
+
 describe('parseEPUB', () => {
   it('parses title and author from the OPF metadata', () => {
     const parsed = parseEPUB(buildTestEpub());
@@ -405,5 +409,87 @@ describe('parseEPUB', () => {
     expect(parsed.sections[0].title).toBe('Глава');
     const texts = contentParagraphs(parsed).map(paragraphText);
     expect(texts.join(' ')).toContain('Текст главы.');
+  });
+
+  it('extracts images inside a paragraph and standalone images not wrapped in a paragraph', () => {
+    // Mirrors two real-world patterns: an <img> sharing a <p> with a caption
+    // <span> (common in InDesign-exported EPUBs), and a bare <img> inside a
+    // wrapper <div> with no surrounding <p> at all.
+    const chapter = `<html><head><title>Ch</title></head>
+<body>
+  <h1>Chapter 1</h1>
+  <p class="foto"><img src="image/1.png" alt=""/><span>Caption text</span></p>
+  <div><img src="image/2.png" alt=""/></div>
+  <p>Normal paragraph text.</p>
+</body>
+</html>`;
+    const zipped = zipSync({
+      'META-INF/container.xml': strToU8(CONTAINER_XML),
+      'OEBPS/content.opf': strToU8(CONTENT_OPF),
+      'OEBPS/chapter1.xhtml': strToU8(chapter),
+      'OEBPS/notes.xhtml': strToU8(NOTES_XHTML),
+      'OEBPS/toc.xhtml': strToU8(TOC_XHTML),
+      'OEBPS/image/1.png': coverPngBytes(),
+      'OEBPS/image/2.png': coverPngBytes(),
+    });
+    const buffer = zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength) as ArrayBuffer;
+
+    const parsed = parseEPUB(buffer);
+    const paragraphs = allBookParagraphs(parsed);
+    expect(paragraphs.filter(isImage).map((image) => image.imageId)).toEqual([
+      'OEBPS/image/1.png',
+      'OEBPS/image/2.png',
+    ]);
+    expect(parsed.images['OEBPS/image/1.png']).toBe(`data:image/png;base64,${COVER_PNG_BASE64}`);
+    expect(parsed.images['OEBPS/image/2.png']).toBe(`data:image/png;base64,${COVER_PNG_BASE64}`);
+    const texts = contentParagraphs(parsed).map(paragraphText);
+    expect(texts).toContain('Caption text');
+    expect(texts).toContain('Normal paragraph text.');
+  });
+
+  it('excludes images inside note bodies from the reading flow', () => {
+    const chapter = `<html xmlns:epub="http://www.idpf.org/2007/ops"><head><title>Ch</title></head>
+<body>
+  <h1>Chapter 1</h1>
+  <p>A claim with an inline footnote<a epub:type="noteref" href="#fn1">1</a> attached.</p>
+  <aside epub:type="footnote" id="fn1"><img src="image/note.png" alt=""/><p>Inline footnote body.</p></aside>
+</body>
+</html>`;
+    const zipped = zipSync({
+      'META-INF/container.xml': strToU8(CONTAINER_XML),
+      'OEBPS/content.opf': strToU8(CONTENT_OPF),
+      'OEBPS/chapter1.xhtml': strToU8(chapter),
+      'OEBPS/notes.xhtml': strToU8(NOTES_XHTML),
+      'OEBPS/toc.xhtml': strToU8(TOC_XHTML),
+      'OEBPS/image/note.png': coverPngBytes(),
+    });
+    const buffer = zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength) as ArrayBuffer;
+
+    const parsed = parseEPUB(buffer);
+    const paragraphs = allBookParagraphs(parsed);
+    expect(paragraphs.filter(isImage)).toEqual([]);
+    expect(parsed.images['OEBPS/image/note.png']).toBeUndefined();
+  });
+
+  it('records an image paragraph even when the referenced file is missing from the archive', () => {
+    const chapter = `<html><head><title>Ch</title></head>
+<body>
+  <h1>Chapter 1</h1>
+  <p><img src="image/missing.png" alt=""/></p>
+</body>
+</html>`;
+    const zipped = zipSync({
+      'META-INF/container.xml': strToU8(CONTAINER_XML),
+      'OEBPS/content.opf': strToU8(CONTENT_OPF),
+      'OEBPS/chapter1.xhtml': strToU8(chapter),
+      'OEBPS/notes.xhtml': strToU8(NOTES_XHTML),
+      'OEBPS/toc.xhtml': strToU8(TOC_XHTML),
+    });
+    const buffer = zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength) as ArrayBuffer;
+
+    const parsed = parseEPUB(buffer);
+    const paragraphs = allBookParagraphs(parsed);
+    expect(paragraphs.filter(isImage).map((image) => image.imageId)).toEqual(['OEBPS/image/missing.png']);
+    expect(parsed.images['OEBPS/image/missing.png']).toBeUndefined();
   });
 });

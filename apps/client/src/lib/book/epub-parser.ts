@@ -1,6 +1,6 @@
 import { unzipSync } from 'fflate';
-import { hasAnyStyle } from './types.ts';
-import type { ParsedBook, SectionItem, TocEntry, Paragraph, NoteRef, Note, TextStyle } from './types.ts';
+import { hasAnyStyle, PageElementType } from './types.ts';
+import type { ParsedBook, SectionItem, TocEntry, Paragraph, BookParagraph, BookImage, NoteRef, Note, TextStyle } from './types.ts';
 
 function decode(bytes: Uint8Array): string {
   return new TextDecoder('utf-8').decode(bytes);
@@ -90,6 +90,25 @@ function extractCoverImage({ opfDoc, manifest, files }: ExtractCoverImageOptions
   if (!mediaType?.startsWith('image/')) return undefined;
 
   return { coverImageId, dataUrl: `data:${mediaType};base64,${bytesToBase64(coverBytes)}` };
+}
+
+type DecodeInTextImagesOptions = { paths: Set<string>; files: Record<string, Uint8Array> };
+
+// Decodes every in-text image referenced from the reading flow into a data
+// URL, keyed by its archive path (the same path used as BookImage.imageId).
+// A missing file or an unrecognized extension just drops that one image
+// rather than aborting the parse.
+function decodeInTextImages({ paths, files }: DecodeInTextImagesOptions): Record<string, string> {
+  const images: Record<string, string> = {};
+  for (const path of paths) {
+    const bytes = files[path];
+    if (!bytes) continue;
+    const extension = path.split('.').pop()?.toLowerCase() ?? '';
+    const mediaType = IMAGE_MEDIA_TYPE_BY_EXTENSION[extension];
+    if (!mediaType) continue;
+    images[path] = `data:${mediaType};base64,${bytesToBase64(bytes)}`;
+  }
+  return images;
 }
 
 // linear=false marks auxiliary documents (spine itemref linear="no", usually
@@ -406,22 +425,61 @@ function isInsideNoteBody({ element, documentPath, noteBodyKeys }: IsInsideNoteB
   return false;
 }
 
+type ExtractImageParagraphOptions = { documentPath: string; imgEl: Element; imagePathsUsed: Set<string> };
+
+// Resolves an <img src> to its archive path — used as both the id recorded
+// for the later decode-to-data-URL pass and the BookImage.imageId that
+// looks it up again at render time.
+function extractImageParagraph({
+  documentPath,
+  imgEl,
+  imagePathsUsed,
+}: ExtractImageParagraphOptions): BookImage | undefined {
+  const src = imgEl.getAttribute('src');
+  if (!src) return undefined;
+  const path = splitHref({ documentPath, href: src }).path;
+  if (!path) return undefined;
+  imagePathsUsed.add(path);
+  return { type: PageElementType.Image, imageId: path };
+}
+
 type ExtractSectionItemOptions = {
   spineDocument: SpineDocument;
   noteCollection: NoteCollection;
+  imagePathsUsed: Set<string>;
 };
 
-function extractSectionItem({ spineDocument, noteCollection }: ExtractSectionItemOptions): SectionItem | undefined {
+function extractSectionItem({
+  spineDocument,
+  noteCollection,
+  imagePathsUsed,
+}: ExtractSectionItemOptions): SectionItem | undefined {
   const { path, document } = spineDocument;
 
   // First heading element becomes the section title
   const headingEl = document.querySelector('h1, h2, h3');
   const title = headingEl?.textContent?.trim() || undefined;
 
-  const paragraphs: Paragraph[] = [];
+  const paragraphs: BookParagraph[] = [];
   let skippedNoteBodies = 0;
-  document.querySelectorAll('p, li, blockquote').forEach((el) => {
-    if (el.tagName.toLowerCase() === 'blockquote') {
+  document.querySelectorAll('p, li, blockquote, img').forEach((el) => {
+    const tag = el.tagName.toLowerCase();
+
+    if (tag === 'img') {
+      // Images nested inside a p/li/blockquote are extracted alongside that
+      // element below (ahead of its text), not here — this branch is only
+      // for images that stand alone, e.g. <div><img/></div> with no
+      // wrapping paragraph. (An image that's a bare, non-<p>-wrapped child
+      // of a verse-style blockquote falls through both branches and is
+      // dropped — an accepted gap, not seen in practice.)
+      if (el.closest('p, li, blockquote')) return;
+      if (isInsideNoteBody({ element: el, documentPath: path, noteBodyKeys: noteCollection.noteBodyKeys })) return;
+      const image = extractImageParagraph({ documentPath: path, imgEl: el, imagePathsUsed });
+      if (image) paragraphs.push(image);
+      return;
+    }
+
+    if (tag === 'blockquote') {
       // Only extract blockquotes that hold bare text (e.g. verse split by
       // <br>); ones built from <p>/<li> are covered by their children, and
       // nested blockquotes by their outermost ancestor.
@@ -431,6 +489,12 @@ function extractSectionItem({ spineDocument, noteCollection }: ExtractSectionIte
       skippedNoteBodies += 1;
       return;
     }
+
+    el.querySelectorAll('img').forEach((imgEl) => {
+      const image = extractImageParagraph({ documentPath: path, imgEl, imagePathsUsed });
+      if (image) paragraphs.push(image);
+    });
+
     if (!el.textContent?.trim()) return;
     const paragraph = parseInlineContent({
       element: el,
@@ -508,9 +572,10 @@ export function parseEPUB(buffer: ArrayBuffer): ParsedBook {
 
   const sections: SectionItem[] = [];
   const sectionIndexByPath = new Map<string, number>();
+  const imagePathsUsed = new Set<string>();
   for (const spineDocument of spineDocuments) {
     if (!spineDocument.linear) continue;
-    const section = extractSectionItem({ spineDocument, noteCollection });
+    const section = extractSectionItem({ spineDocument, noteCollection, imagePathsUsed });
     if (section) {
       sectionIndexByPath.set(spineDocument.path, sections.length);
       sections.push(section);
@@ -519,11 +584,11 @@ export function parseEPUB(buffer: ArrayBuffer): ParsedBook {
 
   const toc = buildToc({ opfDoc, manifest, files, sections, sectionIndexByPath });
 
-  // TODO: add EPUB support for in-text images; only the cover is extracted.
   const coverImage = extractCoverImage({ opfDoc, manifest, files });
-  const images: Record<string, string> = coverImage
-    ? { [coverImage.coverImageId]: coverImage.dataUrl }
-    : {};
+  const images: Record<string, string> = {
+    ...decodeInTextImages({ paths: imagePathsUsed, files }),
+    ...(coverImage ? { [coverImage.coverImageId]: coverImage.dataUrl } : {}),
+  };
 
   return { title, author, sections, toc, notes: noteCollection.notes, images, coverImageId: coverImage?.coverImageId };
 }

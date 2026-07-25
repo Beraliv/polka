@@ -14,6 +14,6 @@ Small features per book format, as implemented in `apps/client/src/lib/book`.
 | Verse & wrapped blocks (poem, epigraph, cite) | ✅ `<v>` and descendants | ✅ bare-text `<blockquote>` |
 | Inline italic / bold | ✅ `<emphasis>` / `<strong>` | ✅ `<em>` / `<i>` / `<strong>` / `<b>` |
 | Footnote popups | ✅ `<a type="note">` + notes body | ✅ `epub:type="noteref"` + endnote heuristics |
-| Images | ✅ `<binary>` base64 → data URL | ❌ |
+| Images | ✅ `<binary>` base64 → data URL | ✅ `<img src>`, inline or standalone |
 | Cover image on the book card | ✅ `<coverpage>` → `<binary>` | ✅ OPF `properties="cover-image"` or `<meta name="cover">` |
 | Vertical gaps | ✅ `<empty-line/>` | ❌ |

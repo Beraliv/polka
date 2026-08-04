@@ -63,6 +63,20 @@ pnpm build          # builds shared → client → server in order
 docker compose build # builds Docker images
 ```
 
+## Before committing
+
+After submitting all changes, always run:
+
+```bash
+pnpm format
+```
+
+Then verify tests pass:
+
+```bash
+pnpm test
+```
+
 ## Commit style
 
 Follow the phase naming from the plan:

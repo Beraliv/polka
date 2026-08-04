@@ -1,6 +1,7 @@
 {
   "name": "polka",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "pnpm --parallel --filter './apps/*' dev",
     "build": "pnpm --filter './packages/*' build && pnpm --filter './apps/*' build",

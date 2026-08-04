@@ -26,7 +26,9 @@ export async function smbRoutes(app: FastifyInstance) {
 
   app.post<{ Body: SmbBody }>('/file', async (req, reply) => {
     const path = req.body.path ?? '';
-    if (!path) return reply.code(400).send({ error: 'path required' });
+    if (!path) {
+      return reply.code(400).send({ error: 'path required' });
+    }
     try {
       const buffer = await readFile(req.body, path);
       const ext = path.toLowerCase().split('.').pop();
@@ -36,7 +38,7 @@ export async function smbRoutes(app: FastifyInstance) {
       reply.header('Content-Type', mime);
       reply.header(
         'Content-Disposition',
-        `attachment; filename="${filename.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodedFilename}`
+        `attachment; filename="${filename.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodedFilename}`,
       );
       return reply.send(buffer);
     } catch (err) {

@@ -68,7 +68,10 @@ function buildTestEpub(): ArrayBuffer {
     'OEBPS/notes.xhtml': strToU8(NOTES_XHTML),
     'OEBPS/toc.xhtml': strToU8(TOC_XHTML),
   });
-  return zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength) as ArrayBuffer;
+  return zipped.buffer.slice(
+    zipped.byteOffset,
+    zipped.byteOffset + zipped.byteLength,
+  ) as ArrayBuffer;
 }
 
 // 1×1 transparent PNG, enough for cover-extraction assertions.
@@ -83,10 +86,14 @@ type BuildEpubWithCoverOptions = { manifestItem: string; metadataExtra?: string 
 
 // Rebuilds the test EPUB with a cover.png plus the given manifest/metadata
 // declarations, covering both the EPUB 3 and EPUB 2 cover conventions.
-function buildEpubWithCover({ manifestItem, metadataExtra }: BuildEpubWithCoverOptions): ArrayBuffer {
-  const opf = CONTENT_OPF
-    .replace('</metadata>', `${metadataExtra ?? ''}</metadata>`)
-    .replace('<manifest>', `<manifest>${manifestItem}`);
+function buildEpubWithCover({
+  manifestItem,
+  metadataExtra,
+}: BuildEpubWithCoverOptions): ArrayBuffer {
+  const opf = CONTENT_OPF.replace('</metadata>', `${metadataExtra ?? ''}</metadata>`).replace(
+    '<manifest>',
+    `<manifest>${manifestItem}`,
+  );
   const zipped = zipSync({
     'META-INF/container.xml': strToU8(CONTAINER_XML),
     'OEBPS/content.opf': strToU8(opf),
@@ -95,7 +102,10 @@ function buildEpubWithCover({ manifestItem, metadataExtra }: BuildEpubWithCoverO
     'OEBPS/toc.xhtml': strToU8(TOC_XHTML),
     'OEBPS/cover.png': coverPngBytes(),
   });
-  return zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength) as ArrayBuffer;
+  return zipped.buffer.slice(
+    zipped.byteOffset,
+    zipped.byteOffset + zipped.byteLength,
+  ) as ArrayBuffer;
 }
 
 // Three chapters with no <h1>/<h2>/<h3> at all — mirroring FB2-to-EPUB
@@ -125,7 +135,10 @@ const TOC_TEST_FILES = {
 
 function zipToBuffer(files: Record<string, Uint8Array>): ArrayBuffer {
   const zipped = zipSync(files);
-  return zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength) as ArrayBuffer;
+  return zipped.buffer.slice(
+    zipped.byteOffset,
+    zipped.byteOffset + zipped.byteLength,
+  ) as ArrayBuffer;
 }
 
 // EPUB 2 NCX: navPoints nest to express TOC depth, "Part One" wrapping two
@@ -305,18 +318,23 @@ describe('parseEPUB', () => {
   });
 
   it('extracts the cover from an EPUB 3 properties="cover-image" manifest item', () => {
-    const parsed = parseEPUB(buildEpubWithCover({
-      manifestItem: '<item id="cover-img" href="cover.png" media-type="image/png" properties="cover-image"/>',
-    }));
+    const parsed = parseEPUB(
+      buildEpubWithCover({
+        manifestItem:
+          '<item id="cover-img" href="cover.png" media-type="image/png" properties="cover-image"/>',
+      }),
+    );
     expect(parsed.coverImageId).toBe('cover-img');
     expect(parsed.images['cover-img']).toBe(`data:image/png;base64,${COVER_PNG_BASE64}`);
   });
 
   it('extracts the cover from an EPUB 2 meta name="cover" reference', () => {
-    const parsed = parseEPUB(buildEpubWithCover({
-      manifestItem: '<item id="cover-img" href="cover.png" media-type="image/png"/>',
-      metadataExtra: '<meta name="cover" content="cover-img"/>',
-    }));
+    const parsed = parseEPUB(
+      buildEpubWithCover({
+        manifestItem: '<item id="cover-img" href="cover.png" media-type="image/png"/>',
+        metadataExtra: '<meta name="cover" content="cover-img"/>',
+      }),
+    );
     expect(parsed.coverImageId).toBe('cover-img');
     expect(parsed.images['cover-img']).toBe(`data:image/png;base64,${COVER_PNG_BASE64}`);
   });
@@ -328,10 +346,12 @@ describe('parseEPUB', () => {
   });
 
   it('survives a malformed meta name="cover" reference instead of aborting the parse', () => {
-    const parsed = parseEPUB(buildEpubWithCover({
-      manifestItem: '<item id="cover-img" href="cover.png" media-type="image/png"/>',
-      metadataExtra: '<meta name="cover" content="bad&quot;quote\\backslash"/>',
-    }));
+    const parsed = parseEPUB(
+      buildEpubWithCover({
+        manifestItem: '<item id="cover-img" href="cover.png" media-type="image/png"/>',
+        metadataExtra: '<meta name="cover" content="bad&quot;quote\\backslash"/>',
+      }),
+    );
     expect(parsed.title).toBe('Test Book');
     expect(parsed.coverImageId).toBeUndefined();
   });
@@ -349,7 +369,10 @@ describe('parseEPUB', () => {
       'OEBPS/notes.xhtml': strToU8(NOTES_XHTML),
       'OEBPS/toc.xhtml': strToU8(TOC_XHTML),
     });
-    const buffer = zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength) as ArrayBuffer;
+    const buffer = zipped.buffer.slice(
+      zipped.byteOffset,
+      zipped.byteOffset + zipped.byteLength,
+    ) as ArrayBuffer;
 
     const parsed = parseEPUB(buffer);
     expect(parsed.sections).toHaveLength(1);
@@ -382,7 +405,7 @@ describe('parseEPUB', () => {
     expect(parsed.toc).toEqual([{ title: 'Chapter 1', level: 1, sectionIndex: 0 }]);
   });
 
-  it('resolves percent-encoded manifest hrefs against the archive\'s literal (decoded) file names', () => {
+  it("resolves percent-encoded manifest hrefs against the archive's literal (decoded) file names", () => {
     // Producers that emit non-ASCII file names (e.g. Adobe InDesign's EPUB
     // export) percent-encode hrefs per the URI spec, but the zip's own entry
     // names are the literal Unicode names — every content lookup silently
@@ -432,7 +455,10 @@ describe('parseEPUB', () => {
       'OEBPS/image/1.png': coverPngBytes(),
       'OEBPS/image/2.png': coverPngBytes(),
     });
-    const buffer = zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength) as ArrayBuffer;
+    const buffer = zipped.buffer.slice(
+      zipped.byteOffset,
+      zipped.byteOffset + zipped.byteLength,
+    ) as ArrayBuffer;
 
     const parsed = parseEPUB(buffer);
     const paragraphs = allBookParagraphs(parsed);
@@ -463,7 +489,10 @@ describe('parseEPUB', () => {
       'OEBPS/toc.xhtml': strToU8(TOC_XHTML),
       'OEBPS/image/note.png': coverPngBytes(),
     });
-    const buffer = zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength) as ArrayBuffer;
+    const buffer = zipped.buffer.slice(
+      zipped.byteOffset,
+      zipped.byteOffset + zipped.byteLength,
+    ) as ArrayBuffer;
 
     const parsed = parseEPUB(buffer);
     const paragraphs = allBookParagraphs(parsed);
@@ -485,11 +514,16 @@ describe('parseEPUB', () => {
       'OEBPS/notes.xhtml': strToU8(NOTES_XHTML),
       'OEBPS/toc.xhtml': strToU8(TOC_XHTML),
     });
-    const buffer = zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength) as ArrayBuffer;
+    const buffer = zipped.buffer.slice(
+      zipped.byteOffset,
+      zipped.byteOffset + zipped.byteLength,
+    ) as ArrayBuffer;
 
     const parsed = parseEPUB(buffer);
     const paragraphs = allBookParagraphs(parsed);
-    expect(paragraphs.filter(isImage).map((image) => image.imageId)).toEqual(['OEBPS/image/missing.png']);
+    expect(paragraphs.filter(isImage).map((image) => image.imageId)).toEqual([
+      'OEBPS/image/missing.png',
+    ]);
     expect(parsed.images['OEBPS/image/missing.png']).toBeUndefined();
   });
 });

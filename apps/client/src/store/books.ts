@@ -39,7 +39,14 @@ type AddBookOptions = {
 };
 
 export class BookStore {
-  static async uploadBook({ book, sections, toc, notes, images, arrayBuffer }: AddBookOptions): Promise<void> {
+  static async uploadBook({
+    book,
+    sections,
+    toc,
+    notes,
+    images,
+    arrayBuffer,
+  }: AddBookOptions): Promise<void> {
     setStore('books', (previousBooks) => {
       const nextBooks = [book, ...previousBooks.filter((storedBook) => storedBook.id !== book.id)];
       try {
@@ -65,11 +72,16 @@ export class BookStore {
 
   static updateTotalPages(id: string, totalPages: number): void {
     setStore('books', (previousBooks) => {
-      const nextBooks = previousBooks.map((storedBook) => (storedBook.id === id ? { ...storedBook, totalPages } : storedBook));
+      const nextBooks = previousBooks.map((storedBook) =>
+        storedBook.id === id ? { ...storedBook, totalPages } : storedBook,
+      );
       try {
         localStorage.setItem(BOOKS_KEY, JSON.stringify(nextBooks));
       } catch (error) {
-        console.error(`[updateTotalPages] Failed to update total pages for book ${id} in local storage:`, error);
+        console.error(
+          `[updateTotalPages] Failed to update total pages for book ${id} in local storage:`,
+          error,
+        );
       }
       return nextBooks;
     });
@@ -91,9 +103,15 @@ export class BookStore {
         ProgressDB.delete(id),
       ]);
       if (bookFilesResult.status === 'rejected') {
-        console.error(`[deleteBook] Failed to delete book files from IndexedDB for ${id}:`, bookFilesResult.reason);
+        console.error(
+          `[deleteBook] Failed to delete book files from IndexedDB for ${id}:`,
+          bookFilesResult.reason,
+        );
       } else if (progressResult.status === 'rejected') {
-        console.error(`[deleteBook] Failed to delete progress from IndexedDB for ${id}:`, progressResult.reason);
+        console.error(
+          `[deleteBook] Failed to delete progress from IndexedDB for ${id}:`,
+          progressResult.reason,
+        );
       } else {
         console.log(`[deleteBook] Successfully deleted book ${id} from IndexedDB.`);
       }

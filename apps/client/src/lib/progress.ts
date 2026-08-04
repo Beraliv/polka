@@ -15,7 +15,9 @@ export async function initProgress(): Promise<void> {
     const migrated: Progress[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (!key?.startsWith(LEGACY_PREFIX)) continue;
+      if (!key?.startsWith(LEGACY_PREFIX)) {
+        continue;
+      }
       try {
         migrated.push(JSON.parse(localStorage.getItem(key)!) as Progress);
       } catch {
@@ -65,7 +67,9 @@ const syncRemote = throttle((progress: Progress) => {
 export async function loadRemoteProgress(bookId: string): Promise<Progress | null> {
   try {
     const res = await fetch(`${store.serverUrl}/api/progress/${bookId}`);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      return null;
+    }
     return (await res.json()) as Progress;
   } catch {
     return null;

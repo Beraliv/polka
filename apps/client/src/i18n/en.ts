@@ -16,8 +16,10 @@ export const en = {
     appTitle: 'Polka',
     emptyStateText: 'No books yet — tap "$addFromDevice" or "$addFromNas" to add one',
     finishedShelfHeading: 'Finished',
-    missingSmbConfigError: 'No SMB configuration found. Add your NAS credentials in Settings and re-open this book to continue reading',
-    missingSmbPathError: 'Re-open this book using "$addFromDevice" or "$addFromNas" to continue reading',
+    missingSmbConfigError:
+      'No SMB configuration found. Add your NAS credentials in Settings and re-open this book to continue reading',
+    missingSmbPathError:
+      'Re-open this book using "$addFromDevice" or "$addFromNas" to continue reading',
     readingShelfHeading: 'Reading',
     settingsTooltip: 'Settings',
     unsupportedFormatError: 'Only EPUB and FB2 files are supported',
@@ -67,7 +69,8 @@ export const en = {
     portLabel: 'Port',
     portPlaceholder: '445',
     saveButton: 'Save',
-    serverUrlHint: 'Address of your self-hosted Polka server. Leave blank when the app is served from the same server.',
+    serverUrlHint:
+      'Address of your self-hosted Polka server. Leave blank when the app is served from the same server.',
     serverUrlLabel: 'Server URL',
     serverUrlPlaceholder: 'http://192.168.1.100:3000',
     serverVersion: 'server v$version',

@@ -23,10 +23,13 @@ afterEach(() => {
 describe('downloadSMBFile', () => {
   it('returns the file contents as an ArrayBuffer', async () => {
     const fileContents = new ArrayBuffer(8);
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      arrayBuffer: () => Promise.resolve(fileContents),
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(fileContents),
+      }),
+    );
 
     await expect(downloadSMBFile(config, '/books/war-and-peace.epub')).resolves.toBe(fileContents);
   });
@@ -34,6 +37,8 @@ describe('downloadSMBFile', () => {
   it('throws when the server responds with an error', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
 
-    await expect(downloadSMBFile(config, '/books/missing.epub')).rejects.toThrow('Failed to download file from SMB');
+    await expect(downloadSMBFile(config, '/books/missing.epub')).rejects.toThrow(
+      'Failed to download file from SMB',
+    );
   });
 });

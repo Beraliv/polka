@@ -14,10 +14,14 @@ const SERVICE_WORKER_UPDATE_INTERVAL_MS = 60 * 60 * 1000;
 registerSW({
   immediate: true,
   onRegisteredSW(_serviceWorkerScriptUrl, registration) {
-    if (!registration) return;
+    if (!registration) {
+      return;
+    }
     setInterval(() => void registration.update(), SERVICE_WORKER_UPDATE_INTERVAL_MS);
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') void registration.update();
+      if (document.visibilityState === 'visible') {
+        void registration.update();
+      }
     });
   },
 });
@@ -25,5 +29,12 @@ registerSW({
 const root = document.getElementById('app')!;
 
 initProgress().then(() => {
-  render(() => <Router><App /></Router>, root);
+  render(
+    () => (
+      <Router>
+        <App />
+      </Router>
+    ),
+    root,
+  );
 });

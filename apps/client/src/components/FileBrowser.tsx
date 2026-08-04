@@ -15,8 +15,12 @@ type Props = {
 };
 
 function formatSize(bytes?: number): string {
-  if (!bytes) return '';
-  if (bytes < 1024 * 1024) return i18n('fileBrowser.sizeKilobytes', { kilobytes: (bytes / 1024).toFixed(0) });
+  if (!bytes) {
+    return '';
+  }
+  if (bytes < 1024 * 1024) {
+    return i18n('fileBrowser.sizeKilobytes', { kilobytes: (bytes / 1024).toFixed(0) });
+  }
   return i18n('fileBrowser.sizeMegabytes', { megabytes: (bytes / (1024 * 1024)).toFixed(1) });
 }
 
@@ -33,9 +37,11 @@ export function FileBrowser(props: Props) {
       const files = await listSMBFiles(props.config, path);
       setEntries(
         [...files].sort((first, second) => {
-          if (first.isDirectory !== second.isDirectory) return first.isDirectory ? -1 : 1;
+          if (first.isDirectory !== second.isDirectory) {
+            return first.isDirectory ? -1 : 1;
+          }
           return first.name.localeCompare(second.name);
-        })
+        }),
       );
       setCurrentPath(path);
     } catch (error) {
@@ -45,7 +51,9 @@ export function FileBrowser(props: Props) {
     }
   }
 
-  onMount(() => { void loadDir(''); });
+  onMount(() => {
+    void loadDir('');
+  });
 
   function handleEntry(entry: FileEntry) {
     if (entry.isDirectory) {
@@ -62,7 +70,9 @@ export function FileBrowser(props: Props) {
   }
 
   function handleOverlayClick(event: MouseEvent) {
-    if (event.target === event.currentTarget) props.onClose();
+    if (event.target === event.currentTarget) {
+      props.onClose();
+    }
   }
 
   return (
@@ -91,7 +101,9 @@ export function FileBrowser(props: Props) {
         </div>
 
         <Show when={loading()}>
-          <div class="loading-center"><span class="spinner" /></div>
+          <div class="loading-center">
+            <span class="spinner" />
+          </div>
         </Show>
 
         <Show when={error()}>
@@ -110,7 +122,9 @@ export function FileBrowser(props: Props) {
                   style={dimmed ? { opacity: '0.35', cursor: 'default' } : {}}
                   onClick={() => handleEntry(entry)}
                 >
-                  <span class="file-icon"><EntryIcon /></span>
+                  <span class="file-icon">
+                    <EntryIcon />
+                  </span>
                   <span class="file-name">{entry.name}</span>
                   <Show when={entry.size}>
                     <span class="file-size">{formatSize(entry.size)}</span>

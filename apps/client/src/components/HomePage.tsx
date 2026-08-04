@@ -42,27 +42,31 @@ export function HomePage() {
   onMount(() => {
     void (async () => {
       const available = new Set<string>();
-      await Promise.all(store.books.map(async (book) => {
-        if (await BookFilesDB.has(book.id)) {
-          available.add(book.id);
-        }
-      }));
+      await Promise.all(
+        store.books.map(async (book) => {
+          if (await BookFilesDB.has(book.id)) {
+            available.add(book.id);
+          }
+        }),
+      );
       setIdbBookIds(available);
     })();
   });
 
   const progressMap = createMemo(() => {
     const map: Record<string, ReturnType<typeof allProgress>[number]> = {};
-    for (const progressEntry of allProgress()) map[progressEntry.bookId] = progressEntry;
+    for (const progressEntry of allProgress()) {
+      map[progressEntry.bookId] = progressEntry;
+    }
     return map;
   });
 
   const activeBooks = createMemo(() =>
-    store.books.filter((book) => !progressMap()[book.id]?.finished)
+    store.books.filter((book) => !progressMap()[book.id]?.finished),
   );
 
   const finishedBooks = createMemo(() =>
-    store.books.filter((book) => !!progressMap()[book.id]?.finished)
+    store.books.filter((book) => !!progressMap()[book.id]?.finished),
   );
 
   async function processBook(buffer: ArrayBuffer, filename: string): Promise<string> {
@@ -95,7 +99,9 @@ export function HomePage() {
 
   async function handleFileChange(event: Event) {
     const file = (event.target as HTMLInputElement).files?.[0];
-    if (!file) return;
+    if (!file) {
+      return;
+    }
     if (!/\.(epub|fb2)$/i.test(file.name)) {
       setAddError(i18n('home.unsupportedFormatError'));
       return;
@@ -115,7 +121,9 @@ export function HomePage() {
   }
 
   async function handleSMBSelect(path: string, filename: string) {
-    if (!store.smb) return;
+    if (!store.smb) {
+      return;
+    }
     setShowBrowser(false);
     setAdding(true);
     setAddError('');
@@ -193,7 +201,9 @@ export function HomePage() {
       </div>
 
       <Show when={adding()}>
-        <div class="loading-center"><span class="spinner" /></div>
+        <div class="loading-center">
+          <span class="spinner" />
+        </div>
       </Show>
 
       <Show when={addError()}>
@@ -202,7 +212,9 @@ export function HomePage() {
 
       <Show when={store.books.length === 0 && !adding()}>
         <div class="empty-state">
-          <div class="empty-state-icon"><LibraryIcon /></div>
+          <div class="empty-state-icon">
+            <LibraryIcon />
+          </div>
           <p class="empty-state-text">
             {i18n('home.emptyStateText', {
               addFromDevice: i18n('home.addFromDeviceButton'),
@@ -264,11 +276,7 @@ export function HomePage() {
             {i18n('home.addFromNasButton')}
           </button>
         </Show>
-        <button
-          class="smb-btn"
-          onClick={() => fileInput.click()}
-          disabled={adding()}
-        >
+        <button class="smb-btn" onClick={() => fileInput.click()} disabled={adding()}>
           {adding() ? '…' : i18n('home.addFromDeviceButton')}
         </button>
       </div>

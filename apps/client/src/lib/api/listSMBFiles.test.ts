@@ -33,7 +33,12 @@ describe('listSMBFiles', () => {
   it('returns the parsed file entries', async () => {
     const entries = [
       { name: 'books', path: '/books', isDirectory: true },
-      { name: 'war-and-peace.epub', path: '/books/war-and-peace.epub', isDirectory: false, size: 1024 },
+      {
+        name: 'war-and-peace.epub',
+        path: '/books/war-and-peace.epub',
+        isDirectory: false,
+        size: 1024,
+      },
     ];
     mockFetchResponse({ ok: true, body: entries });
 

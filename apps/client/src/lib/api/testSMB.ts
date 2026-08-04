@@ -7,7 +7,13 @@ const errorResponseSchema = z.object({
   error: z.string(),
 });
 
-export async function testSMB({ config, serverUrl }: { config: SMBConfig; serverUrl?: string }): Promise<void> {
+export async function testSMB({
+  config,
+  serverUrl,
+}: {
+  config: SMBConfig;
+  serverUrl?: string;
+}): Promise<void> {
   const res = await fetch(apiUrl('/api/smb/test', serverUrl ?? store.serverUrl), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

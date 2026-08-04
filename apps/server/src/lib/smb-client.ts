@@ -25,10 +25,16 @@ type WithTimeoutOptions<ResultType> = {
   timeoutMessage: string;
 };
 
-function withTimeout<ResultType>({ promise, timeoutMs, timeoutMessage }: WithTimeoutOptions<ResultType>): Promise<ResultType> {
+function withTimeout<ResultType>({
+  promise,
+  timeoutMs,
+  timeoutMessage,
+}: WithTimeoutOptions<ResultType>): Promise<ResultType> {
   return Promise.race([
     promise,
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs)),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs),
+    ),
   ]);
 }
 
@@ -49,10 +55,10 @@ export async function listFiles(config: SMBConfig, path: string): Promise<FileEn
   const smb = createClient(config);
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const entries = await smb.readdir(path, { stats: true }) as any[];
+    const entries = (await smb.readdir(path, { stats: true })) as any[];
     return entries.map((entry) => ({
       name: entry.name as string,
-      path: path ? `${path}\\${(entry.name as string)}` : (entry.name as string),
+      path: path ? `${path}\\${entry.name as string}` : (entry.name as string),
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       isDirectory: entry.isDirectory() as boolean,
     }));

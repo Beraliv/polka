@@ -18,7 +18,9 @@ export function throttle<Args extends unknown[]>(
     // Within the throttle window: remember the latest arguments and invoke
     // once the window expires, so the final call is never dropped.
     pendingArgs = args;
-    if (pendingTimer !== undefined) return;
+    if (pendingTimer !== undefined) {
+      return;
+    }
 
     pendingTimer = setTimeout(() => {
       pendingTimer = undefined;

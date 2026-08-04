@@ -39,18 +39,22 @@ describe('parseFB2', () => {
   });
 
   it('extracts the coverpage image as the cover', () => {
-    const parsed = parseFB2(buildTestFb2({
-      coverpage: '<coverpage><image l:href="#cover.png"/></coverpage>',
-      binaries: COVER_BINARY,
-    }));
+    const parsed = parseFB2(
+      buildTestFb2({
+        coverpage: '<coverpage><image l:href="#cover.png"/></coverpage>',
+        binaries: COVER_BINARY,
+      }),
+    );
     expect(parsed.coverImageId).toBe('cover.png');
     expect(parsed.images['cover.png']).toBe(`data:image/png;base64,${COVER_PNG_BASE64}`);
   });
 
   it('returns no cover when the coverpage references a missing binary', () => {
-    const parsed = parseFB2(buildTestFb2({
-      coverpage: '<coverpage><image l:href="#missing.png"/></coverpage>',
-    }));
+    const parsed = parseFB2(
+      buildTestFb2({
+        coverpage: '<coverpage><image l:href="#missing.png"/></coverpage>',
+      }),
+    );
     expect(parsed.coverImageId).toBeUndefined();
   });
 

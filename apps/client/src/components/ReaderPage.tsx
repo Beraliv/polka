@@ -1,4 +1,14 @@
-import { createSignal, createEffect, For, Show, Switch, Match, onMount, onCleanup, batch } from 'solid-js';
+import {
+  createSignal,
+  createEffect,
+  For,
+  Show,
+  Switch,
+  Match,
+  onMount,
+  onCleanup,
+  batch,
+} from 'solid-js';
 import { Dynamic } from 'solid-js/web';
 import { useNavigate, useParams } from '@solidjs/router';
 import { ChevronLeftIcon } from './ChevronLeftIcon.tsx';
@@ -21,7 +31,16 @@ import {
   isNoteRef,
   PageElementType,
 } from '../lib/book';
-import type { SectionItem, Page, Paragraph, NoteRef, Note, BookImageAsset, TextStyle, TocEntry as ParsedTocEntry } from '../lib/book';
+import type {
+  SectionItem,
+  Page,
+  Paragraph,
+  NoteRef,
+  Note,
+  BookImageAsset,
+  TextStyle,
+  TocEntry as ParsedTocEntry,
+} from '../lib/book';
 import type { Progress } from '@polka/shared';
 import { i18n } from '../i18n';
 import { debounce } from '../lib/debounce.ts';
@@ -54,7 +73,8 @@ function tokenize(paragraph: Paragraph): Token[] {
 
 function sameStyle(first: TextStyle | undefined, second: TextStyle | undefined): boolean {
   return (
-    Boolean(first?.italic) === Boolean(second?.italic) && Boolean(first?.bold) === Boolean(second?.bold)
+    Boolean(first?.italic) === Boolean(second?.italic) &&
+    Boolean(first?.bold) === Boolean(second?.bold)
   );
 }
 
@@ -64,7 +84,9 @@ function tokensToRich(tokens: Token[]): Paragraph {
   let bufferStyle: TextStyle | undefined;
 
   const flushTextBuffer = () => {
-    if (!textBuffer) return;
+    if (!textBuffer) {
+      return;
+    }
     if (bufferStyle && hasAnyStyle(bufferStyle)) {
       segments.push({ text: textBuffer, style: bufferStyle });
     } else {
@@ -126,10 +148,17 @@ type MaxFittingTokensOptions = {
   noIndent: boolean;
 };
 
-function maxFittingTokens({ container, tokens, availableHeight, noIndent }: MaxFittingTokensOptions): number {
+function maxFittingTokens({
+  container,
+  tokens,
+  availableHeight,
+  noIndent,
+}: MaxFittingTokensOptions): number {
   const measureEl = document.createElement('p');
   measureEl.className = noIndent ? 'reader-paragraph no-indent' : 'reader-paragraph';
-  let low = 0, high = tokens.length - 1, count = 0;
+  let low = 0,
+    high = tokens.length - 1,
+    count = 0;
   while (low <= high) {
     const mid = Math.floor((low + high) / 2);
     measureEl.textContent = '';
@@ -137,7 +166,12 @@ function maxFittingTokens({ container, tokens, availableHeight, noIndent }: MaxF
     container.appendChild(measureEl);
     const fits = container.scrollHeight <= availableHeight;
     container.removeChild(measureEl);
-    if (fits) { count = mid + 1; low = mid + 1; } else { high = mid - 1; }
+    if (fits) {
+      count = mid + 1;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
   }
   return count;
 }
@@ -191,7 +225,9 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Built
   const contentWidth =
     availableWidth - parseFloat(computedStyle.paddingLeft) - parseFloat(computedStyle.paddingRight);
   const contentHeight =
-    availableHeight - parseFloat(computedStyle.paddingTop) - parseFloat(computedStyle.paddingBottom);
+    availableHeight -
+    parseFloat(computedStyle.paddingTop) -
+    parseFloat(computedStyle.paddingBottom);
 
   const pages: Page[] = [];
   const sectionStartPageIndexes: number[] = [];
@@ -218,7 +254,9 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Built
     for (const paragraph of section.paragraphs) {
       if (isImage(paragraph)) {
         const asset = imageAssets[paragraph.imageId];
-        if (!asset) continue;
+        if (!asset) {
+          continue;
+        }
         // Scale down to the maximum display size, preserving the aspect ratio.
         const scale = Math.min(
           1,
@@ -242,7 +280,9 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Built
 
       if (isEmptyLine(paragraph)) {
         // An empty line at the top of a page carries no meaning — drop it.
-        if (current.length === 0) continue;
+        if (current.length === 0) {
+          continue;
+        }
         const emptyLineEl = document.createElement('div');
         emptyLineEl.className = 'reader-empty-line';
         container.appendChild(emptyLineEl);
@@ -268,7 +308,11 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Built
         container.appendChild(paragraphEl);
 
         if (container.scrollHeight <= availableHeight) {
-          current.push({ type: PageElementType.Paragraph, content: tokensToRich(remaining), noIndent: isContinuation });
+          current.push({
+            type: PageElementType.Paragraph,
+            content: tokensToRich(remaining),
+            noIndent: isContinuation,
+          });
           remaining = [];
         } else {
           container.removeChild(paragraphEl);
@@ -280,7 +324,11 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Built
           });
 
           if (fitting > 0) {
-            current.push({ type: PageElementType.Paragraph, content: tokensToRich(remaining.slice(0, fitting)), noIndent: isContinuation });
+            current.push({
+              type: PageElementType.Paragraph,
+              content: tokensToRich(remaining.slice(0, fitting)),
+              noIndent: isContinuation,
+            });
             remaining = remaining.slice(fitting);
             isContinuation = true;
             flush(current);
@@ -290,7 +338,11 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Built
             current = [];
           } else {
             // Paragraph larger than a full page — include as-is to avoid infinite loop
-            current.push({ type: PageElementType.Paragraph, content: tokensToRich(remaining), noIndent: isContinuation });
+            current.push({
+              type: PageElementType.Paragraph,
+              content: tokensToRich(remaining),
+              noIndent: isContinuation,
+            });
             remaining = [];
             flush(current);
             current = [];
@@ -314,7 +366,9 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Built
  * and total pages.
  */
 function progressFraction(progress: Progress | null): number {
-  if (!progress || progress.totalPages <= 1) return 0;
+  if (!progress || progress.totalPages <= 1) {
+    return 0;
+  }
   return (progress.currentPage - 1) / (progress.totalPages - 1);
 }
 
@@ -346,11 +400,15 @@ function ReaderImage(props: ReaderImageProps) {
 
   function handleTouchEnd(event: TouchEvent) {
     const touch = event.changedTouches[0];
-    if (!touch) return;
+    if (!touch) {
+      return;
+    }
     const isTap =
       Math.abs(touch.clientX - touchStartX) <= TAP_MOVE_TOLERANCE_PX &&
       Math.abs(touch.clientY - touchStartY) <= TAP_MOVE_TOLERANCE_PX;
-    if (!isTap) return;
+    if (!isTap) {
+      return;
+    }
     // Suppress the synthetic click that follows the tap and keep the tap away
     // from the reader's edge-tap page navigation.
     event.preventDefault();
@@ -388,7 +446,9 @@ function PageContent(props: PageContentProps) {
         <Switch>
           <Match when={asPageHeading(item)} keyed>
             {(heading) => (
-              <Dynamic component={`h${heading.level}`} class="reader-section-title">{heading.title}</Dynamic>
+              <Dynamic component={`h${heading.level}`} class="reader-section-title">
+                {heading.title}
+              </Dynamic>
             )}
           </Match>
           <Match when={asPageEmptyLine(item)}>
@@ -408,7 +468,9 @@ function PageContent(props: PageContentProps) {
               <p class="reader-paragraph" classList={{ 'no-indent': paragraph.noIndent }}>
                 <For each={paragraph.content}>
                   {(span) => {
-                    if (typeof span === 'string') return <>{span}</>;
+                    if (typeof span === 'string') {
+                      return <>{span}</>;
+                    }
                     if (isNoteRef(span)) {
                       return (
                         <button
@@ -470,13 +532,17 @@ export function ReaderPage() {
 
   const activeNote = (): Note | null => {
     const id = activeNoteId();
-    if (!id) return null;
+    if (!id) {
+      return null;
+    }
     return store.notes?.[bookId]?.[id] ?? null;
   };
 
   const fullscreenImage = (): BookImageAsset | null => {
     const id = fullscreenImageId();
-    if (!id) return null;
+    if (!id) {
+      return null;
+    }
     return imageAssets()[id] ?? null;
   };
 
@@ -492,7 +558,9 @@ export function ReaderPage() {
     const entries: TocEntry[] = [];
     parsedEntries.forEach((entry: ParsedTocEntry) => {
       const pageIndex = startPageIndexes[entry.sectionIndex];
-      if (pageIndex === undefined) return;
+      if (pageIndex === undefined) {
+        return;
+      }
       const level = Math.min(Math.max(entry.level, 1), 5);
       entries.push({ title: entry.title, level, pageIndex });
     });
@@ -505,7 +573,9 @@ export function ReaderPage() {
     const lastVisiblePageIndex = pageIdx() + pageStep() - 1;
     let activeIndex = -1;
     tocEntries().forEach((entry, entryIndex) => {
-      if (entry.pageIndex <= lastVisiblePageIndex) activeIndex = entryIndex;
+      if (entry.pageIndex <= lastVisiblePageIndex) {
+        activeIndex = entryIndex;
+      }
     });
     return activeIndex;
   };
@@ -525,7 +595,9 @@ export function ReaderPage() {
   }
 
   function seekToPageNumber(pageNumber: number) {
-    if (Number.isNaN(pageNumber)) return;
+    if (Number.isNaN(pageNumber)) {
+      return;
+    }
     setPageIdx(clampPageIndex(pageNumber - 1, total()));
     scrollToTop();
   }
@@ -535,9 +607,13 @@ export function ReaderPage() {
   // calls collapses into one rebuild RESIZE_DEBOUNCE_MS after the last one,
   // which also gives layout time to settle before measuring.
   const repaginate = debounce((restoreFraction: number) => {
-    if (!pageEl) return;
+    if (!pageEl) {
+      return;
+    }
     const sections = store.sections[bookId];
-    if (!sections?.length) return;
+    if (!sections?.length) {
+      return;
+    }
 
     const built = buildPages({ pageEl, sections, imageAssets: imageAssets() });
     BookStore.updateTotalPages(bookId, built.pages.length);
@@ -566,7 +642,9 @@ export function ReaderPage() {
 
   onMount(() => {
     const originalLang = document.documentElement.lang;
-    onCleanup(() => { document.documentElement.lang = originalLang; });
+    onCleanup(() => {
+      document.documentElement.lang = originalLang;
+    });
 
     async function init() {
       if (!store.sections[bookId]) {
@@ -586,14 +664,18 @@ export function ReaderPage() {
       setImageAssets(await decodeImageAssets(store.images[bookId] ?? {}));
 
       const bookLang = book()?.lang;
-      if (bookLang) document.documentElement.lang = bookLang;
+      if (bookLang) {
+        document.documentElement.lang = bookLang;
+      }
 
       const local = loadProgress(bookId);
       smbPath = local?.smbPath;
       const localFraction = progressFraction(local);
 
       void loadRemoteProgress(bookId).then((remote) => {
-        if (!remote) return;
+        if (!remote) {
+          return;
+        }
         const remoteFraction = progressFraction(remote);
         if (remoteFraction > progressFraction(loadProgress(bookId))) {
           const total = localPages().length;
@@ -613,18 +695,27 @@ export function ReaderPage() {
 
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
-        if (activeNoteId() || fullscreenImageId() || tocOpen()) return;
+        if (activeNoteId() || fullscreenImageId() || tocOpen()) {
+          return;
+        }
         event.preventDefault();
         nextPage();
       } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
-        if (activeNoteId() || fullscreenImageId() || tocOpen()) return;
+        if (activeNoteId() || fullscreenImageId() || tocOpen()) {
+          return;
+        }
         event.preventDefault();
         prevPage();
       } else if (event.key === 'Escape') {
-        if (fullscreenImageId()) setFullscreenImageId(null);
-        else if (activeNoteId()) setActiveNoteId(null);
-        else if (tocOpen()) setTocOpen(false);
-        else navigate('/');
+        if (fullscreenImageId()) {
+          setFullscreenImageId(null);
+        } else if (activeNoteId()) {
+          setActiveNoteId(null);
+        } else if (tocOpen()) {
+          setTocOpen(false);
+        } else {
+          navigate('/');
+        }
       }
     };
     document.addEventListener('keydown', handleKey);
@@ -634,8 +725,7 @@ export function ReaderPage() {
     // not on iOS/iPadOS); repaginate is debounced, so the burst collapses
     // into a single rebuild.
     const handleResize = () => {
-      const currentFraction =
-        localPages().length > 1 ? pageIdx() / (localPages().length - 1) : 0;
+      const currentFraction = localPages().length > 1 ? pageIdx() / (localPages().length - 1) : 0;
       batch(() => setReady(false));
       repaginate(currentFraction);
     };
@@ -654,11 +744,15 @@ export function ReaderPage() {
   });
 
   createEffect(() => {
-    if (!ready()) return;
+    if (!ready()) {
+      return;
+    }
     const pageIndex = pageIdx();
     const currentBook = book();
     const total = localPages().length;
-    if (!currentBook || total === 0) return;
+    if (!currentBook || total === 0) {
+      return;
+    }
     const lastVisiblePage = Math.min(pageIndex + pageStep(), total);
     const progress: Progress = {
       bookId,
@@ -675,18 +769,30 @@ export function ReaderPage() {
 
   function handleContentTouchStart(event: TouchEvent) {
     const touch = event.touches[0];
-    if (touch) { touchStartX = touch.clientX; touchStartY = touch.clientY; }
+    if (touch) {
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+    }
   }
 
   function handleContentTouchEnd(event: TouchEvent) {
-    if (activeNoteId()) return;
+    if (activeNoteId()) {
+      return;
+    }
     const touch = event.changedTouches[0];
-    if (!touch) return;
-    if (Math.abs(touch.clientX - touchStartX) > 10 || Math.abs(touch.clientY - touchStartY) > 10) return;
+    if (!touch) {
+      return;
+    }
+    if (Math.abs(touch.clientX - touchStartX) > 10 || Math.abs(touch.clientY - touchStartY) > 10) {
+      return;
+    }
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const zone = 2 * parseFloat(getComputedStyle(document.documentElement).fontSize);
-    if (touch.clientX < rect.left + zone) prevPage();
-    else if (touch.clientX > rect.right - zone) nextPage();
+    if (touch.clientX < rect.left + zone) {
+      prevPage();
+    } else if (touch.clientX > rect.right - zone) {
+      nextPage();
+    }
   }
 
   const currentPage = () => localPages()[pageIdx()] ?? [];
@@ -697,7 +803,9 @@ export function ReaderPage() {
   const pageRangeLabel = () => {
     const firstPageNumber = pageIdx() + 1;
     const lastPageNumber = lastVisiblePageNumber();
-    return lastPageNumber > firstPageNumber ? `${firstPageNumber}-${lastPageNumber}` : `${firstPageNumber}`;
+    return lastPageNumber > firstPageNumber
+      ? `${firstPageNumber}-${lastPageNumber}`
+      : `${firstPageNumber}`;
   };
 
   return (
@@ -753,7 +861,9 @@ export function ReaderPage() {
           <ChevronRightIcon />
         </button>
         <Show when={!ready()}>
-          <div class="reader-loading"><span class="spinner" /></div>
+          <div class="reader-loading">
+            <span class="spinner" />
+          </div>
         </Show>
         <div class="reader-pages">
           <div class="reader-page" ref={pageEl}>
@@ -790,7 +900,9 @@ export function ReaderPage() {
             max={Math.max(1, total())}
             value={pageIdx() + 1}
             style={{ '--progress-percent': `${percent()}%` }}
-            onInput={ready() ? (event) => seekToPageNumber(event.currentTarget.valueAsNumber) : noop}
+            onInput={
+              ready() ? (event) => seekToPageNumber(event.currentTarget.valueAsNumber) : noop
+            }
             aria-label={i18n('reader.pageSliderLabel')}
           />
           <div class="reader-percent">{percent()}%</div>
@@ -862,7 +974,11 @@ export function ReaderPage() {
                 </Show>
                 <p class="note-popup-text">{note.text}</p>
               </div>
-              <button class="note-popup-close" onClick={() => setActiveNoteId(null)} aria-label={i18n('reader.ariaCloseNote')}>
+              <button
+                class="note-popup-close"
+                onClick={() => setActiveNoteId(null)}
+                aria-label={i18n('reader.ariaCloseNote')}
+              >
                 <CloseIcon />
               </button>
             </div>

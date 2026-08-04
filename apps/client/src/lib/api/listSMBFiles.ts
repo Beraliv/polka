@@ -17,6 +17,8 @@ export async function listSMBFiles(config: SMBConfig, path = ''): Promise<FileEn
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...config, path }),
   });
-  if (!res.ok) throw new Error('Failed to list SMB files');
+  if (!res.ok) {
+    throw new Error('Failed to list SMB files');
+  }
   return fileEntryListSchema.parse(await res.json());
 }

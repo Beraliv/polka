@@ -9,7 +9,9 @@ async function decodeImageAsset(dataUrl: string): Promise<BookImageAsset | null>
     // Corrupt or unsupported binary data — the image is skipped during pagination.
     return null;
   }
-  if (image.naturalWidth <= 0 || image.naturalHeight <= 0) return null;
+  if (image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+    return null;
+  }
   return { dataUrl, width: image.naturalWidth, height: image.naturalHeight };
 }
 
@@ -33,14 +35,18 @@ export async function createCoverThumbnail(coverDataUrl: string): Promise<string
     // Corrupt or unsupported cover data — the card falls back to the format badge.
     return undefined;
   }
-  if (image.naturalWidth <= 0 || image.naturalHeight <= 0) return undefined;
+  if (image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+    return undefined;
+  }
 
   const scale = Math.min(1, COVER_THUMBNAIL_MAX_HEIGHT_PX / image.naturalHeight);
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
   canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
   const context = canvas.getContext('2d');
-  if (!context) return undefined;
+  if (!context) {
+    return undefined;
+  }
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   return canvas.toDataURL('image/jpeg', 0.8);
 }
@@ -57,7 +63,9 @@ export async function decodeImageAssets(
   await Promise.all(
     Object.entries(dataUrls).map(async ([imageId, dataUrl]) => {
       const asset = await decodeImageAsset(dataUrl);
-      if (asset) assets[imageId] = asset;
+      if (asset) {
+        assets[imageId] = asset;
+      }
     }),
   );
   return assets;

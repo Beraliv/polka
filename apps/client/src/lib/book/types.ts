@@ -50,8 +50,7 @@ export function isImage(paragraph: BookParagraph): paragraph is BookImage {
   return 'type' in paragraph && paragraph.type === PageElementType.Image;
 }
 
-export type SectionItem =
-  | { level?: number; title?: string; paragraphs: BookParagraph[] }
+export type SectionItem = { level?: number; title?: string; paragraphs: BookParagraph[] };
 
 /**
  * One entry in the reader's table of contents: a title/level pair pointing at
@@ -98,11 +97,11 @@ export type PageHeadingElement = {
   level: number;
   title: string;
   type: typeof PageElementType.Heading;
-}
+};
 
 export type PageEmptyLineElement = {
   type: typeof PageElementType.EmptyLine;
-}
+};
 
 export type PageImageElement = {
   imageHeight: number;

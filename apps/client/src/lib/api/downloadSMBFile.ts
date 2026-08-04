@@ -7,6 +7,8 @@ export async function downloadSMBFile(config: SMBConfig, path: string): Promise<
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...config, path }),
   });
-  if (!res.ok) throw new Error('Failed to download file from SMB');
+  if (!res.ok) {
+    throw new Error('Failed to download file from SMB');
+  }
   return res.arrayBuffer();
 }

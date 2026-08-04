@@ -38,3 +38,7 @@
 ## Git
 
 - **When a commit addresses a GitHub issue, link it with `Closes #<issue-number>`** on its own line in the commit message body.
+
+## Workflow
+
+- **After submitting all changes, always run `nvm use && pnpm run format`, then verify tests pass with `pnpm run test`**, before considering the work done.

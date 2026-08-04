@@ -2,7 +2,13 @@
 
 import { describe, expect, it } from 'vitest';
 import { isIOS, NavigatorLike } from './';
-import { GOOGLE_PIXEL_CHROME, IPAD_OS_SAFARI, IPHONE_SAFARI, IPOD_SAFARI, MACOS_SAFARI } from './userAgents'
+import {
+  GOOGLE_PIXEL_CHROME,
+  IPAD_OS_SAFARI,
+  IPHONE_SAFARI,
+  IPOD_SAFARI,
+  MACOS_SAFARI,
+} from './userAgents';
 
 type TestCase = {
   description: string;
@@ -12,7 +18,8 @@ type TestCase = {
 
 const testCases: TestCase[] = [
   {
-    description: 'returns false for iPadOS Safari (reports as a desktop Mac, but has touch support)',
+    description:
+      'returns false for iPadOS Safari (reports as a desktop Mac, but has touch support)',
     navigator: IPAD_OS_SAFARI,
     expected: false,
   },

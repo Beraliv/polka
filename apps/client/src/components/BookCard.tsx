@@ -58,7 +58,9 @@ export function BookCard(props: Props) {
           when={props.progress}
           fallback={
             <Show when={props.book.totalPages > 0}>
-              <div class="progress-text">{i18n('bookCard.totalPages', { totalPages: props.book.totalPages })}</div>
+              <div class="progress-text">
+                {i18n('bookCard.totalPages', { totalPages: props.book.totalPages })}
+              </div>
             </Show>
           }
         >

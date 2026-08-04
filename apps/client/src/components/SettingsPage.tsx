@@ -133,7 +133,11 @@ export function SettingsPage() {
           <input
             type="password"
             autocomplete="current-password"
-            placeholder={existing ? i18n('settings.passwordUpdatePlaceholder') : i18n('settings.passwordPlaceholder')}
+            placeholder={
+              existing
+                ? i18n('settings.passwordUpdatePlaceholder')
+                : i18n('settings.passwordPlaceholder')
+            }
             value={password()}
             onInput={(event) => setPassword(event.currentTarget.value)}
           />
@@ -158,15 +162,21 @@ export function SettingsPage() {
           <button class="btn-secondary" onClick={() => void handleTest()} disabled={busy()}>
             {busy() ? i18n('settings.testingButton') : i18n('settings.testConnectionButton')}
           </button>
-          <button class="btn" onClick={handleSave}>{i18n('settings.saveButton')}</button>
+          <button class="btn" onClick={handleSave}>
+            {i18n('settings.saveButton')}
+          </button>
           <Show when={existing}>
-            <button class="btn-danger" onClick={handleClear}>{i18n('settings.disconnectNasButton')}</button>
+            <button class="btn-danger" onClick={handleClear}>
+              {i18n('settings.disconnectNasButton')}
+            </button>
           </Show>
         </div>
 
         <p class="app-version">
           {i18n('settings.clientVersion', { version: __APP_VERSION__ })}
-          {serverVersion() ? ' · ' + i18n('settings.serverVersion', { version: serverVersion()! }) : ''}
+          {serverVersion()
+            ? ' · ' + i18n('settings.serverVersion', { version: serverVersion()! })
+            : ''}
         </p>
         <p class="app-credit">
           {i18n('settings.developedWith')} <HeartIcon /> {i18n('settings.developedBy')}

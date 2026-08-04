@@ -9,7 +9,9 @@ vi.mock('../../store/books.ts', () => ({
 
 describe('apiUrl', () => {
   it('builds the URL from the explicit server URL', () => {
-    expect(apiUrl('/api/version', 'http://nas.local:3001')).toBe('http://nas.local:3001/api/version');
+    expect(apiUrl('/api/version', 'http://nas.local:3001')).toBe(
+      'http://nas.local:3001/api/version',
+    );
   });
 
   it('falls back to the store server URL when none is given', () => {

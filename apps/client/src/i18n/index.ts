@@ -27,38 +27,37 @@ type Digit = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
  * explicit Digit union is needed because `' ' extends `${number}`` is true
  * (whitespace strings are assignable to `${number}`).
  */
-type IsWordCharacter<Character extends string> =
-  Character extends Digit
-    ? true
-    : Uppercase<Character> extends Lowercase<Character>
-      ? false
-      : true;
+type IsWordCharacter<Character extends string> = Character extends Digit
+  ? true
+  : Uppercase<Character> extends Lowercase<Character>
+    ? false
+    : true;
 
 /** Splits Text into its leading run of word characters and the rest. */
-type SplitLeadingWord<Text extends string, Name extends string = ''> =
-  Text extends `${infer Character}${infer Rest}`
-    ? IsWordCharacter<Character> extends true
-      ? SplitLeadingWord<Rest, `${Name}${Character}`>
-      : [Name, Text]
-    : [Name, Text];
+type SplitLeadingWord<
+  Text extends string,
+  Name extends string = '',
+> = Text extends `${infer Character}${infer Rest}`
+  ? IsWordCharacter<Character> extends true
+    ? SplitLeadingWord<Rest, `${Name}${Character}`>
+    : [Name, Text]
+  : [Name, Text];
 
 /** Union of `$name` placeholder names in Template; never when there are none. */
-type PlaceholderNames<Template extends string> =
-  Template extends `${string}$${infer AfterDollar}`
-    ? SplitLeadingWord<AfterDollar> extends [infer Name extends string, infer Rest extends string]
-      ? (Name extends '' ? never : Name) | PlaceholderNames<Rest>
-      : never
-    : never;
+type PlaceholderNames<Template extends string> = Template extends `${string}$${infer AfterDollar}`
+  ? SplitLeadingWord<AfterDollar> extends [infer Name extends string, infer Rest extends string]
+    ? (Name extends '' ? never : Name) | PlaceholderNames<Rest>
+    : never
+  : never;
 
 /** The English template text behind a dotted key */
-type TemplateOf<Key extends TranslationKey> =
-  Key extends `${infer Group}.${infer Name}`
-    ? Group extends keyof typeof en
-      ? Name extends keyof (typeof en)[Group]
-        ? (typeof en)[Group][Name] & string
-        : never
+type TemplateOf<Key extends TranslationKey> = Key extends `${infer Group}.${infer Name}`
+  ? Group extends keyof typeof en
+    ? Name extends keyof (typeof en)[Group]
+      ? (typeof en)[Group][Name] & string
       : never
-    : never;
+    : never
+  : never;
 
 /** Keys whose template contains at least one `$name` placeholder. */
 type KeyWithPlaceholders = {
@@ -87,12 +86,19 @@ const PLACEHOLDER_PATTERN = /\$([A-Za-z][A-Za-z0-9]*)/g;
  * back to the key itself.
  */
 export function i18n<Key extends KeyWithoutPlaceholders>(key: Key): string;
-export function i18n<Key extends KeyWithPlaceholders>(key: Key, options: TranslationOptions<Key>): string;
+export function i18n<Key extends KeyWithPlaceholders>(
+  key: Key,
+  options: TranslationOptions<Key>,
+): string;
 export function i18n(key: string, options?: Record<string, string | number>): string {
   const [groupName, phraseName] = key.split('.');
   const template = activeDictionary[groupName ?? '']?.[phraseName ?? ''];
-  if (template === undefined) return key;
-  if (!options) return template;
+  if (template === undefined) {
+    return key;
+  }
+  if (!options) {
+    return template;
+  }
   return template.replace(PLACEHOLDER_PATTERN, (placeholder, name: string) =>
     name in options ? String(options[name]) : placeholder,
   );

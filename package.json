@@ -5,11 +5,16 @@
     "dev": "pnpm --parallel --filter './apps/*' dev",
     "build": "pnpm --filter './packages/*' build && pnpm --filter './apps/*' build",
     "test": "pnpm --recursive run test",
-    "lint": "pnpm --recursive run lint"
+    "lint": "pnpm --recursive run lint",
+    "format": "pnpm --recursive run format"
   },
   "engines": {
     "node": ">=24",
     "pnpm": ">=11"
   },
-  "packageManager": "pnpm@11.9.0"
+  "packageManager": "pnpm@11.9.0",
+  "devDependencies": {
+    "oxfmt": "^0.62.0",
+    "oxlint": "^1.75.0"
+  }
 }

@@ -1,24 +1,34 @@
 import { PageElementType, hasAnyStyle } from './types.ts';
-import type { ParsedBook, SectionItem, TocEntry, Paragraph, BookParagraph, NoteRef, Note, TextStyle } from './types.ts';
+import type {
+  ParsedBook,
+  SectionItem,
+  TocEntry,
+  Paragraph,
+  BookParagraph,
+  NoteRef,
+  Note,
+  TextStyle,
+} from './types.ts';
 
 // Resolves the id referenced by an FB2 link attribute (l:href / xlink:href / href).
 function linkedResourceId(el: Element): string | undefined {
   const href =
-    el.getAttribute('l:href') ??
-    el.getAttribute('xlink:href') ??
-    el.getAttribute('href') ??
-    '';
+    el.getAttribute('l:href') ?? el.getAttribute('xlink:href') ?? el.getAttribute('href') ?? '';
   const id = href.startsWith('#') ? href.slice(1) : href;
   return id || undefined;
 }
 
 function getTitle(section: Element): string | undefined {
   const titleEl = section.querySelector(':scope > title');
-  if (!titleEl) return undefined;
+  if (!titleEl) {
+    return undefined;
+  }
   const parts: string[] = [];
   titleEl.querySelectorAll('p').forEach((paragraphEl) => {
     const text = paragraphEl.textContent?.trim();
-    if (text) parts.push(text);
+    if (text) {
+      parts.push(text);
+    }
   });
   return parts.join(' ') || undefined;
 }
@@ -32,7 +42,9 @@ function parseInlineContent({ element, inheritedStyle }: ParseInlineContentOptio
   for (const node of element.childNodes) {
     if (node.nodeType === Node.TEXT_NODE) {
       const text = node.textContent ?? '';
-      if (!text) continue;
+      if (!text) {
+        continue;
+      }
       if (hasAnyStyle(inheritedStyle)) {
         segments.push({ text, style: inheritedStyle });
       } else {
@@ -49,11 +61,17 @@ function parseInlineContent({ element, inheritedStyle }: ParseInlineContentOptio
         }
       } else if (tag === 'emphasis') {
         segments.push(
-          ...parseInlineContent({ element: child, inheritedStyle: { ...inheritedStyle, italic: true } }),
+          ...parseInlineContent({
+            element: child,
+            inheritedStyle: { ...inheritedStyle, italic: true },
+          }),
         );
       } else if (tag === 'strong') {
         segments.push(
-          ...parseInlineContent({ element: child, inheritedStyle: { ...inheritedStyle, bold: true } }),
+          ...parseInlineContent({
+            element: child,
+            inheritedStyle: { ...inheritedStyle, bold: true },
+          }),
         );
       } else {
         segments.push(...parseInlineContent({ element: child, inheritedStyle }));
@@ -77,10 +95,14 @@ function parseImageElement(el: Element): BookParagraph | undefined {
 function collectTextParagraph(el: Element, out: BookParagraph[]): void {
   el.querySelectorAll('image').forEach((imageEl) => {
     const image = parseImageElement(imageEl);
-    if (image) out.push(image);
+    if (image) {
+      out.push(image);
+    }
   });
   const paragraph = parseParagraphElement(el);
-  if (paragraph.length > 0) out.push(paragraph);
+  if (paragraph.length > 0) {
+    out.push(paragraph);
+  }
 }
 
 // Collect all <p>/<v>/<empty-line>/<image> descendants of el, skipping <annotation>, <title>, and nested <section> subtrees.
@@ -93,7 +115,9 @@ function collectParagraphs(el: Element, out: BookParagraph[]): void {
       out.push({ type: PageElementType.EmptyLine });
     } else if (tag === 'image') {
       const image = parseImageElement(child);
-      if (image) out.push(image);
+      if (image) {
+        out.push(image);
+      }
     } else if (tag !== 'annotation' && tag !== 'title' && tag !== 'section') {
       collectParagraphs(child, out);
     }
@@ -105,14 +129,18 @@ function collectDirectParagraphs(section: Element): BookParagraph[] {
   const out: BookParagraph[] = [];
   for (const child of section.children) {
     const tag = child.tagName.toLowerCase();
-    if (tag === 'title' || tag === 'section' || tag === 'annotation') continue;
+    if (tag === 'title' || tag === 'section' || tag === 'annotation') {
+      continue;
+    }
     if (tag === 'p' || tag === 'v') {
       collectTextParagraph(child, out);
     } else if (tag === 'empty-line') {
       out.push({ type: PageElementType.EmptyLine });
     } else if (tag === 'image') {
       const image = parseImageElement(child);
-      if (image) out.push(image);
+      if (image) {
+        out.push(image);
+      }
     } else {
       // poem, epigraph, cite, etc. — grab all p/v/empty-line/image descendants
       child.querySelectorAll('p, v, empty-line, image').forEach((el) => {
@@ -123,11 +151,15 @@ function collectDirectParagraphs(section: Element): BookParagraph[] {
         }
         if (nestedTag === 'image') {
           const image = parseImageElement(el);
-          if (image) out.push(image);
+          if (image) {
+            out.push(image);
+          }
           return;
         }
         const paragraph = parseParagraphElement(el);
-        if (paragraph.length > 0) out.push(paragraph);
+        if (paragraph.length > 0) {
+          out.push(paragraph);
+        }
       });
     }
   }
@@ -140,7 +172,9 @@ function collectDirectParagraphs(section: Element): BookParagraph[] {
 function buildTocFromSections(sections: SectionItem[]): TocEntry[] {
   const toc: TocEntry[] = [];
   sections.forEach((section, sectionIndex) => {
-    if (section.title) toc.push({ title: section.title, level: section.level ?? 1, sectionIndex });
+    if (section.title) {
+      toc.push({ title: section.title, level: section.level ?? 1, sectionIndex });
+    }
   });
   return toc;
 }
@@ -168,36 +202,50 @@ function collectSections({ section, level, out }: CollectSectionsOptions): void 
 function parseNotes(doc: Document): Record<string, Note> {
   const notes: Record<string, Note> = {};
   const notesBody = doc.querySelector('FictionBook > body[name="notes"]');
-  if (!notesBody) return notes;
+  if (!notesBody) {
+    return notes;
+  }
   notesBody.querySelectorAll('section[id]').forEach((section) => {
     const id = section.getAttribute('id');
-    if (!id) return;
+    if (!id) {
+      return;
+    }
 
     const titleEl = section.querySelector(':scope > title');
     const titleParts: string[] = [];
     titleEl?.querySelectorAll('p').forEach((paragraphEl) => {
       const text = paragraphEl.textContent?.trim();
-      if (text) titleParts.push(text);
+      if (text) {
+        titleParts.push(text);
+      }
     });
     const title = titleParts.join(' ') || undefined;
 
     const textParts: string[] = [];
     for (const child of section.children) {
       const tag = child.tagName.toLowerCase();
-      if (tag === 'title' || tag === 'section') continue;
+      if (tag === 'title' || tag === 'section') {
+        continue;
+      }
       if (tag === 'p' || tag === 'v') {
         const text = child.textContent?.trim();
-        if (text) textParts.push(text);
+        if (text) {
+          textParts.push(text);
+        }
       } else {
         child.querySelectorAll('p, v').forEach((paragraphEl) => {
           const text = paragraphEl.textContent?.trim();
-          if (text) textParts.push(text);
+          if (text) {
+            textParts.push(text);
+          }
         });
       }
     }
 
     const text = textParts.join(' ');
-    if (title || text) notes[id] = { title, text };
+    if (title || text) {
+      notes[id] = { title, text };
+    }
   });
   return notes;
 }
@@ -207,11 +255,17 @@ function parseBinaryImages(doc: Document): Record<string, string> {
   const images: Record<string, string> = {};
   doc.querySelectorAll('FictionBook > binary').forEach((binaryEl) => {
     const id = binaryEl.getAttribute('id');
-    if (!id) return;
+    if (!id) {
+      return;
+    }
     const contentType = binaryEl.getAttribute('content-type');
-    if (!contentType) return;
+    if (!contentType) {
+      return;
+    }
     const base64 = binaryEl.textContent?.replace(/\s+/g, '') ?? '';
-    if (base64) images[id] = `data:${contentType};base64,${base64}`;
+    if (base64) {
+      images[id] = `data:${contentType};base64,${base64}`;
+    }
   });
   return images;
 }
@@ -220,7 +274,9 @@ type ParseCoverImageIdOptions = { doc: Document; images: Record<string, string> 
 
 function parseCoverImageId({ doc, images }: ParseCoverImageIdOptions): string | undefined {
   const coverImageEl = doc.querySelector('description coverpage > image');
-  if (!coverImageEl) return undefined;
+  if (!coverImageEl) {
+    return undefined;
+  }
   const coverImageId = linkedResourceId(coverImageEl);
   return coverImageId && images[coverImageId] ? coverImageId : undefined;
 }
@@ -246,14 +302,18 @@ export function parseFB2(buffer: ArrayBuffer): ParsedBook {
   const sections: SectionItem[] = [];
 
   doc.querySelectorAll('FictionBook > body').forEach((body) => {
-    if (body.getAttribute('name') === 'notes') return;
+    if (body.getAttribute('name') === 'notes') {
+      return;
+    }
 
     const topSections = childSections(body);
 
     if (topSections.length === 0) {
       const paragraphs: BookParagraph[] = [];
       collectParagraphs(body, paragraphs);
-      if (paragraphs.length > 0) sections.push({ paragraphs });
+      if (paragraphs.length > 0) {
+        sections.push({ paragraphs });
+      }
       return;
     }
 

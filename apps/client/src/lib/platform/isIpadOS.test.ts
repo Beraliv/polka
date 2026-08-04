@@ -2,7 +2,13 @@
 
 import { describe, expect, it } from 'vitest';
 import { isIpadOS, NavigatorLike } from './';
-import { GOOGLE_PIXEL_CHROME, IPAD_OS_SAFARI, IPHONE_SAFARI, IPOD_SAFARI, MACOS_SAFARI } from './userAgents'
+import {
+  GOOGLE_PIXEL_CHROME,
+  IPAD_OS_SAFARI,
+  IPHONE_SAFARI,
+  IPOD_SAFARI,
+  MACOS_SAFARI,
+} from './userAgents';
 
 type TestCase = {
   description: string;

@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc"
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    // SolidJS assigns ref-bound `let x: T;` declarations (e.g. `<div ref={x}>`)
+    // at the JSX/runtime level, which this rule can't see — it's a real
+    // pattern here, not a bug. See HomePage.tsx/ReaderPage.tsx.
+    "no-unassigned-vars": "off",
+    // Always require braces, even for single-statement if/else — no
+    // `if (a) return;`, always `if (a) {\n  return;\n}`.
+    "curly": ["error", "all"]
+  },
+  "env": {
+    "builtin": true
+  }
+}

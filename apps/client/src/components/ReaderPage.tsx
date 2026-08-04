@@ -44,6 +44,7 @@ import type {
 import type { Progress } from '@polka/shared';
 import { i18n } from '../i18n';
 import { debounce } from '../lib/debounce.ts';
+import { formatDuration } from '../lib/formatDuration.ts';
 import { noop } from '../lib/noop.ts';
 
 // Internal token for pagination: words (optionally styled) or atomic note references.
@@ -653,7 +654,10 @@ export function ReaderPage() {
           navigate('/');
           return;
         }
+        const parseStartMs = performance.now();
         const parsed = parseBook({ buffer: file.arrayBuffer, format: file.format });
+        const parseEndMs = performance.now();
+        console.log(`Parsed book ${bookId} in ${formatDuration(parseEndMs - parseStartMs)}`);
         setStore('sections', bookId, parsed.sections);
         setStore('toc', bookId, parsed.toc);
         setStore('notes', bookId, parsed.notes);
@@ -661,7 +665,15 @@ export function ReaderPage() {
       }
 
       // Decode image sizes before the first pagination so image heights are known.
-      setImageAssets(await decodeImageAssets(store.images[bookId] ?? {}));
+      const decodeStartMs = performance.now();
+      const decodedImageAssets = await decodeImageAssets(store.images[bookId] ?? {});
+      const decodeEndMs = performance.now();
+      console.log(
+        `Decoded ${Object.keys(decodedImageAssets).length} images for book ${bookId} in ${formatDuration(
+          decodeEndMs - decodeStartMs,
+        )}`,
+      );
+      setImageAssets(decodedImageAssets);
 
       const bookLang = book()?.lang;
       if (bookLang) {
@@ -672,23 +684,38 @@ export function ReaderPage() {
       smbPath = local?.smbPath;
       const localFraction = progressFraction(local);
 
-      void loadRemoteProgress(bookId).then((remote) => {
-        if (!remote) {
-          return;
-        }
-        const remoteFraction = progressFraction(remote);
-        if (remoteFraction > progressFraction(loadProgress(bookId))) {
-          const total = localPages().length;
-          if (total > 0) {
-            const remoteIndex = Math.round(remoteFraction * Math.max(0, total - 1));
-            setPageIdx(clampPageIndex(remoteIndex, total));
-          }
-        }
-      });
-
+      // render the first page quickly not to block the UI
       requestAnimationFrame(() => {
         repaginate(localFraction);
       });
+
+      const remoteConfigStartMs = performance.now();
+      const remote = await loadRemoteProgress(bookId);
+      if (remote !== null) {
+        const remoteConfigEndMs = performance.now();
+        console.log(
+          `Loaded remote progress for book ${bookId} in ${formatDuration(
+            remoteConfigEndMs - remoteConfigStartMs,
+          )}`,
+        );
+
+        const remoteFraction = progressFraction(remote);
+        if (remoteFraction > localFraction) {
+          // Only repaginate when the remote progress is further along than
+          // the local progress — otherwise a stale/unsynced remote copy
+          // would yank the reader backward past what they've already read.
+          requestAnimationFrame(() => {
+            repaginate(remoteFraction);
+          });
+        }
+      } else {
+        const remoteConfigEndMs = performance.now();
+        console.log(
+          `No remote progress for book ${bookId} could be found in ${formatDuration(
+            remoteConfigEndMs - remoteConfigStartMs,
+          )}`,
+        );
+      }
     }
 
     void init();

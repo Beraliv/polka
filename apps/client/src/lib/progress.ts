@@ -64,14 +64,22 @@ const syncRemote = throttle((progress: Progress) => {
   });
 }, SYNC_INTERVAL_MS);
 
+const REMOTE_PROGRESS_TIMEOUT_MS = 10_000;
+
 export async function loadRemoteProgress(bookId: string): Promise<Progress | null> {
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), REMOTE_PROGRESS_TIMEOUT_MS);
   try {
-    const res = await fetch(`${store.serverUrl}/api/progress/${bookId}`);
+    const res = await fetch(`${store.serverUrl}/api/progress/${bookId}`, {
+      signal: abortController.signal,
+    });
     if (!res.ok) {
       return null;
     }
     return (await res.json()) as Progress;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }

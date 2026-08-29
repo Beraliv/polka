@@ -1,196 +1,92 @@
-import { createSignal, onMount, Show } from 'solid-js';
-import { useNavigate } from '@solidjs/router';
+import { createEffect, createMemo, createSignal, onMount, Show } from 'solid-js';
+import { Dynamic } from 'solid-js/web';
+import { useNavigate, useParams } from '@solidjs/router';
 import { ChevronLeftIcon } from './ChevronLeftIcon.tsx';
 import { HeartIcon } from './HeartIcon.tsx';
-import { store, BookStore } from '../store/books.ts';
-import { testSMB, fetchServerVersion } from '../lib/api';
-import type { SMBConfig } from '@polka/shared';
+import { SettingsMenu } from './SettingsMenu.tsx';
+import { resolveSettingsPath, settingsNodePath, settingsRoot } from '../settings/tree.ts';
+import { fetchServerVersion } from '../lib/api';
 import { i18n } from '../i18n';
 
 export function SettingsPage() {
   const navigate = useNavigate();
-  const existing = store.smb;
+  const params = useParams<{ path: string }>();
+
+  const segments = createMemo(() => params.path.split('/').filter(Boolean));
+  const chain = createMemo(() => resolveSettingsPath(segments()));
+
+  // An unresolvable path (bad bookmark, typo, or segments past a leaf page)
+  // falls back to the settings root; redirect so the URL bar matches.
+  createEffect(() => {
+    if (!chain()) {
+      navigate('/settings', { replace: true });
+    }
+  });
+
+  const resolvedChain = createMemo(() => chain() ?? [settingsRoot]);
+  const currentNode = createMemo(() => resolvedChain().at(-1) ?? settingsRoot);
+  const groupNode = createMemo(() => {
+    const node = currentNode();
+    return node.type === 'group' ? node : null;
+  });
+  const pageNode = createMemo(() => {
+    const node = currentNode();
+    return node.type === 'page' ? node : null;
+  });
+  const isRoot = () => (chain()?.length ?? 0) <= 1;
+
+  function goBack() {
+    const nodes = chain();
+    navigate(!nodes || nodes.length <= 1 ? '/' : settingsNodePath(nodes.slice(0, -1)));
+  }
 
   const [serverVersion, setServerVersion] = createSignal<string | null>(null);
   onMount(() => {
     void fetchServerVersion().then(setServerVersion);
   });
 
-  const [serverUrl, setServerUrl] = createSignal(store.serverUrl ?? '');
-  const [ip, setIp] = createSignal(existing?.ip ?? '');
-  const [port, setPort] = createSignal(String(existing?.port ?? 445));
-  const [username, setUsername] = createSignal(existing?.username ?? '');
-  const [password, setPassword] = createSignal('');
-  const [share, setShare] = createSignal(existing?.share ?? '');
-  const [busy, setBusy] = createSignal(false);
-  const [status, setStatus] = createSignal<'idle' | 'ok' | 'error'>('idle');
-  const [statusMessage, setStatusMessage] = createSignal('');
-
-  function buildConfig(): SMBConfig {
-    return {
-      ip: ip().trim(),
-      port: Number(port()) || 445,
-      username: username().trim(),
-      password: password(),
-      share: share().trim(),
-    };
-  }
-
-  async function handleTest() {
-    setBusy(true);
-    setStatus('idle');
-    try {
-      await testSMB({ config: buildConfig(), serverUrl: serverUrl().trim().replace(/\/+$/, '') });
-      setStatus('ok');
-      setStatusMessage(i18n('settings.connectionSuccessful'));
-    } catch (error) {
-      setStatus('error');
-      setStatusMessage(error instanceof Error ? error.message : String(error));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function handleSave() {
-    const url = serverUrl();
-    if (url.trim()) {
-      BookStore.saveServerUrl(url);
-    } else {
-      BookStore.deleteServerUrl();
-    }
-    const config = buildConfig();
-    if (!config.password && existing?.password) {
-      config.password = existing.password;
-    }
-    BookStore.saveSMBConfig(config);
-    navigate('/');
-  }
-
-  function handleClear() {
-    BookStore.deleteSMBConfig();
-    navigate('/');
-  }
-
   return (
     <div class="page">
       <div class="page-header">
         <button
           class="icon-btn"
-          onClick={() => navigate('/')}
+          onClick={goBack}
           title={i18n('settings.backTooltip')}
           aria-label={i18n('settings.backTooltip')}
         >
           <ChevronLeftIcon />
         </button>
-        <h1 class="page-title">{i18n('settings.title')}</h1>
+        <h1 class="page-title">{i18n(currentNode().labelKey)}</h1>
         <div style={{ width: '40px' }} />
       </div>
 
       <div class="settings-form">
-        <div class="field">
-          <label>{i18n('settings.serverUrlLabel')}</label>
-          <input
-            type="url"
-            inputmode="url"
-            placeholder={i18n('settings.serverUrlPlaceholder')}
-            value={serverUrl()}
-            onInput={(event) => setServerUrl(event.currentTarget.value)}
-          />
-          <p class="field-hint">{i18n('settings.serverUrlHint')}</p>
-        </div>
-        <div class="field">
-          <label>{i18n('settings.ipAddressLabel')}</label>
-          <input
-            type="text"
-            inputmode="url"
-            placeholder={i18n('settings.ipAddressPlaceholder')}
-            value={ip()}
-            onInput={(event) => setIp(event.currentTarget.value)}
-          />
-        </div>
-        <div class="field">
-          <label>{i18n('settings.portLabel')}</label>
-          <input
-            type="number"
-            inputmode="numeric"
-            placeholder={i18n('settings.portPlaceholder')}
-            value={port()}
-            onInput={(event) => setPort(event.currentTarget.value)}
-          />
-        </div>
-        <div class="field">
-          <label>{i18n('settings.usernameLabel')}</label>
-          <input
-            type="text"
-            autocomplete="username"
-            placeholder={i18n('settings.usernamePlaceholder')}
-            value={username()}
-            onInput={(event) => setUsername(event.currentTarget.value)}
-          />
-        </div>
-        <div class="field">
-          <label>{i18n('settings.passwordLabel')}</label>
-          <input
-            type="password"
-            autocomplete="current-password"
-            placeholder={
-              existing
-                ? i18n('settings.passwordUpdatePlaceholder')
-                : i18n('settings.passwordPlaceholder')
-            }
-            value={password()}
-            onInput={(event) => setPassword(event.currentTarget.value)}
-          />
-        </div>
-        <div class="field">
-          <label>{i18n('settings.shareNameLabel')}</label>
-          <input
-            type="text"
-            placeholder={i18n('settings.shareNamePlaceholder')}
-            value={share()}
-            onInput={(event) => setShare(event.currentTarget.value)}
-          />
-        </div>
-
-        <Show when={status() !== 'idle'}>
-          <div class={`status-msg ${status() === 'ok' ? 'status-ok' : 'status-error'}`}>
-            {statusMessage()}
-          </div>
+        <Show when={groupNode()}>
+          {(node) => <SettingsMenu node={node()} parentPath={settingsNodePath(resolvedChain())} />}
         </Show>
+        <Show when={pageNode()}>{(node) => <Dynamic component={node().component} />}</Show>
 
-        <div class="settings-actions">
-          <button class="btn-secondary" onClick={() => void handleTest()} disabled={busy()}>
-            {busy() ? i18n('settings.testingButton') : i18n('settings.testConnectionButton')}
-          </button>
-          <button class="btn" onClick={handleSave}>
-            {i18n('settings.saveButton')}
-          </button>
-          <Show when={existing}>
-            <button class="btn-danger" onClick={handleClear}>
-              {i18n('settings.disconnectNasButton')}
-            </button>
-          </Show>
-        </div>
-
-        <p class="app-version">
-          {i18n('settings.clientVersion', { version: __APP_VERSION__ })}
-          {serverVersion()
-            ? ' · ' + i18n('settings.serverVersion', { version: serverVersion()! })
-            : ''}
-        </p>
-        <p class="app-credit">
-          {i18n('settings.developedWith')} <HeartIcon /> {i18n('settings.developedBy')}
-        </p>
-        <p class="app-credit">
-          <a
-            class="app-credit-link"
-            href="https://github.com/Beraliv/polka"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {i18n('settings.githubLinkLabel')}
-          </a>
-        </p>
+        <Show when={isRoot()}>
+          <p class="app-version">
+            {i18n('settings.clientVersion', { version: __APP_VERSION__ })}
+            {serverVersion()
+              ? ' · ' + i18n('settings.serverVersion', { version: serverVersion()! })
+              : ''}
+          </p>
+          <p class="app-credit">
+            {i18n('settings.developedWith')} <HeartIcon /> {i18n('settings.developedBy')}
+          </p>
+          <p class="app-credit">
+            <a
+              class="app-credit-link"
+              href="https://github.com/Beraliv/polka"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {i18n('settings.githubLinkLabel')}
+            </a>
+          </p>
+        </Show>
       </div>
     </div>
   );

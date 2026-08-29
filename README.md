@@ -27,6 +27,7 @@ A mobile-first e-book reader for EPUB and FB2 files, designed to run on TrueNAS.
 - **Dark theme** — easy on the eyes for night reading
 - **Installable as a PWA** — add to home screen; app shell works offline
 - **Installable on TrueNAS SCALE** via Docker Compose
+- **Developer settings** — a "Force Restart" option reloads the app right away, useful if it feels stuck after an update
 
 See [docs/features.md](docs/features.md) for a detailed FB2 vs EPUB support matrix.
 

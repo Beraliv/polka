@@ -752,6 +752,41 @@ h5.reader-section-title {
 
 /* ---- Settings ---- */
 
+.settings-menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.settings-menu li + li {
+  border-top: 1px solid var(--border);
+}
+
+.settings-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.settings-menu-item:hover {
+  background: var(--surface2);
+}
+
+.settings-menu-item svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
 .settings-form {
   padding: 8px 0;
   display: flex;

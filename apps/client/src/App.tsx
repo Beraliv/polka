@@ -8,7 +8,7 @@ export function App() {
     <>
       <Route path="/" component={HomePage} />
       <Route path="/reader/:id" component={ReaderPage} />
-      <Route path="/settings" component={SettingsPage} />
+      <Route path="/settings/*path" component={SettingsPage} />
     </>
   );
 }

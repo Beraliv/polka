@@ -64,7 +64,7 @@ type KeyWithPlaceholders = {
   [Key in TranslationKey]: [PlaceholderNames<TemplateOf<Key>>] extends [never] ? never : Key;
 }[TranslationKey];
 
-type KeyWithoutPlaceholders = Exclude<TranslationKey, KeyWithPlaceholders>;
+export type KeyWithoutPlaceholders = Exclude<TranslationKey, KeyWithPlaceholders>;
 
 export type TranslationOptions<Key extends KeyWithPlaceholders> = {
   [Name in PlaceholderNames<TemplateOf<Key>>]: string | number;

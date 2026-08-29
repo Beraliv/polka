@@ -48,7 +48,6 @@ export const en = {
     backTooltip: 'Back',
     closeTooltip: 'Close',
     nextPage: 'Next page',
-    pageSliderLabel: 'Go to page',
     previousPage: 'Previous page',
     tocTitle: 'Contents',
     tocTooltip: 'Table of contents',

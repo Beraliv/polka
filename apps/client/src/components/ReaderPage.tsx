@@ -45,7 +45,6 @@ import type { Progress } from '@polka/shared';
 import { i18n } from '../i18n';
 import { debounce } from '../lib/debounce.ts';
 import { formatDuration } from '../lib/formatDuration.ts';
-import { noop } from '../lib/noop.ts';
 
 // Internal token for pagination: words (optionally styled) or atomic note references.
 type Token = { text: string; style?: TextStyle } | NoteRef;
@@ -595,14 +594,6 @@ export function ReaderPage() {
     });
   }
 
-  function seekToPageNumber(pageNumber: number) {
-    if (Number.isNaN(pageNumber)) {
-      return;
-    }
-    setPageIdx(clampPageIndex(pageNumber - 1, total()));
-    scrollToTop();
-  }
-
   // Expensive operation (it measures every paragraph), so the debounce is
   // baked in: no call site can trigger back-to-back rebuilds. A burst of
   // calls collapses into one rebuild RESIZE_DEBOUNCE_MS after the last one,
@@ -920,18 +911,15 @@ export function ReaderPage() {
 
       <div class="reader-footer" style={{ visibility: ready() ? 'visible' : 'hidden' }}>
         <div class="reader-progress-wrap">
-          <input
-            class="reader-progress-slider"
-            type="range"
-            min="1"
-            max={Math.max(1, total())}
-            value={pageIdx() + 1}
-            style={{ '--progress-percent': `${percent()}%` }}
-            onInput={
-              ready() ? (event) => seekToPageNumber(event.currentTarget.valueAsNumber) : noop
-            }
-            aria-label={i18n('reader.pageSliderLabel')}
-          />
+          <div
+            class="reader-progress-bar"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={percent()}
+          >
+            <div class="reader-progress-fill" style={{ width: `${percent()}%` }} />
+          </div>
           <div class="reader-percent">{percent()}%</div>
         </div>
       </div>

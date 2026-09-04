@@ -3,10 +3,9 @@ import { A, useNavigate } from '@solidjs/router';
 import { LibraryIcon } from './LibraryIcon.tsx';
 import { SettingsIcon } from './SettingsIcon.tsx';
 import { store, BookStore } from '../store/books.ts';
-import { allProgress } from '../lib/progress.ts';
 import { parseBook, computeBookId, createCoverThumbnail } from '../lib/book';
 import { downloadSMBFile } from '../lib/api';
-import { loadProgress, saveProgress } from '../lib/progress.ts';
+import { allProgress, loadProgress, resolveBestProgress, saveProgress } from '../lib/progress.ts';
 import { BookFilesDB } from '../lib/polka-db.ts';
 import { isIOS, isIpadOS } from '../lib/platform';
 import { BookCard } from './BookCard.tsx';
@@ -130,16 +129,18 @@ export function HomePage() {
     try {
       const buffer = await downloadSMBFile(path);
       const bookId = await processBook(buffer, filename);
-      // Persist SMB path so re-download is possible after reload
-      const previousProgress = loadProgress(bookId);
+      // Persisted so re-download is possible after reload — resolveBestProgress
+      // is required here rather than local progress, since this device may
+      // have none yet (see resolveBestProgress for what that would break).
+      const bestProgress = await resolveBestProgress(bookId);
       saveProgress({
         bookId,
-        bookName: previousProgress?.bookName ?? filename,
-        currentPage: previousProgress?.currentPage ?? 0,
-        totalPages: previousProgress?.totalPages ?? 0,
-        percent: previousProgress?.percent ?? 0,
-        lastRead: previousProgress?.lastRead ?? Date.now(),
-        finished: previousProgress?.finished ?? false,
+        bookName: bestProgress?.bookName ?? filename,
+        currentPage: bestProgress?.currentPage ?? 0,
+        totalPages: bestProgress?.totalPages ?? 0,
+        percent: bestProgress?.percent ?? 0,
+        lastRead: bestProgress?.lastRead ?? Date.now(),
+        finished: bestProgress?.finished ?? false,
         smbPath: path,
       });
       navigate(`/reader/${bookId}`);

@@ -16,7 +16,7 @@ import { ChevronRightIcon } from './ChevronRightIcon.tsx';
 import { CloseIcon } from './CloseIcon.tsx';
 import { TocIcon } from './TocIcon.tsx';
 import { store, setStore, BookStore } from '../store/books.ts';
-import { loadProgress, loadRemoteProgress, saveProgress } from '../lib/progress.ts';
+import { saveProgress, resolveBestProgress, progressFraction } from '../lib/progress.ts';
 import { BookFilesDB } from '../lib/polka-db.ts';
 import {
   parseBook,
@@ -361,17 +361,6 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Built
   return { pages, sectionStartPageIndexes };
 }
 
-/**
- * Returns the progress as a fraction between 0 and 1 based on the current page
- * and total pages.
- */
-function progressFraction(progress: Progress | null): number {
-  if (!progress || progress.totalPages <= 1) {
-    return 0;
-  }
-  return (progress.currentPage - 1) / (progress.totalPages - 1);
-}
-
 // A touch is treated as a tap only if the finger stayed within this distance,
 // mirroring the reader's page-turn tap detection.
 const TAP_MOVE_TOLERANCE_PX = 10;
@@ -510,7 +499,10 @@ export function ReaderPage() {
   const [pageIdx, setPageIdx] = createSignal(0);
   const [localPages, setLocalPages] = createSignal<Page[]>([]);
   const [sectionStartPageIndexes, setSectionStartPageIndexes] = createSignal<number[]>([]);
-  const [ready, setReady] = createSignal(false);
+  // One signal rather than separate booleans, so nothing can act on the
+  // reader (e.g. handleResize below) while it's ambiguously between states.
+  const [stage, setStage] = createSignal<'loading' | 'parsing' | 'paginating' | 'ready'>('loading');
+  const ready = () => stage() === 'ready';
   const [tocOpen, setTocOpen] = createSignal(false);
   const [activeNoteId, setActiveNoteId] = createSignal<string | null>(null);
   const [fullscreenImageId, setFullscreenImageId] = createSignal<string | null>(null);
@@ -594,11 +586,10 @@ export function ReaderPage() {
     });
   }
 
-  // Expensive operation (it measures every paragraph), so the debounce is
-  // baked in: no call site can trigger back-to-back rebuilds. A burst of
-  // calls collapses into one rebuild RESIZE_DEBOUNCE_MS after the last one,
-  // which also gives layout time to settle before measuring.
-  const repaginate = debounce((restoreFraction: number) => {
+  // Not debounced: called directly (not through `repaginate` below) by the
+  // restore sequence, since debouncing it there would let a resize event's
+  // `repaginate(...)` call race with, and cancel, the restore's own call.
+  function buildAndSetPages(restoreFraction: number) {
     if (!pageEl) {
       return;
     }
@@ -614,9 +605,22 @@ export function ReaderPage() {
       setSectionStartPageIndexes(built.sectionStartPageIndexes);
       const restoredIndex = Math.round(restoreFraction * Math.max(0, built.pages.length - 1));
       setPageIdx(clampPageIndex(restoredIndex, built.pages.length));
-      setReady(true);
+      setStage('ready');
     });
-  }, RESIZE_DEBOUNCE_MS);
+  }
+
+  // Debounced because it measures every paragraph on every call, and the
+  // delay doubles as time for layout to settle before measuring.
+  const repaginate = debounce(buildAndSetPages, RESIZE_DEBOUNCE_MS);
+
+  function paginateOnNextFrame(restoreFraction: number): Promise<void> {
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => {
+        buildAndSetPages(restoreFraction);
+        resolve();
+      });
+    });
+  }
 
   function nextPage() {
     setPageIdx((current) => clampPageIndex(current + pageStep(), localPages().length));
@@ -638,30 +642,43 @@ export function ReaderPage() {
       document.documentElement.lang = originalLang;
     });
 
-    async function init() {
+    type InitialPosition = { fraction: number; smbPath: string | undefined };
+
+    async function resolveInitialPosition(): Promise<InitialPosition> {
+      const startMs = performance.now();
+      const best = await resolveBestProgress(bookId);
+      console.log(
+        `Resolved reading position for book ${bookId} in ${formatDuration(performance.now() - startMs)}`,
+      );
+      return { fraction: progressFraction(best), smbPath: best?.smbPath };
+    }
+
+    async function loadAndParseBook(): Promise<boolean> {
       if (!store.sections[bookId]) {
+        setStage('loading');
         const file = await BookFilesDB.download(bookId);
         if (!file) {
           navigate('/');
-          return;
+          return false;
         }
+        setStage('parsing');
         const parseStartMs = performance.now();
         const parsed = parseBook({ buffer: file.arrayBuffer, format: file.format });
-        const parseEndMs = performance.now();
-        console.log(`Parsed book ${bookId} in ${formatDuration(parseEndMs - parseStartMs)}`);
+        console.log(`Parsed book ${bookId} in ${formatDuration(performance.now() - parseStartMs)}`);
         setStore('sections', bookId, parsed.sections);
         setStore('toc', bookId, parsed.toc);
         setStore('notes', bookId, parsed.notes);
         setStore('images', bookId, parsed.images);
+      } else {
+        setStage('parsing');
       }
 
-      // Decode image sizes before the first pagination so image heights are known.
+      // Must happen before pagination: buildPages() needs image heights.
       const decodeStartMs = performance.now();
       const decodedImageAssets = await decodeImageAssets(store.images[bookId] ?? {});
-      const decodeEndMs = performance.now();
       console.log(
         `Decoded ${Object.keys(decodedImageAssets).length} images for book ${bookId} in ${formatDuration(
-          decodeEndMs - decodeStartMs,
+          performance.now() - decodeStartMs,
         )}`,
       );
       setImageAssets(decodedImageAssets);
@@ -670,43 +687,23 @@ export function ReaderPage() {
       if (bookLang) {
         document.documentElement.lang = bookLang;
       }
+      return true;
+    }
 
-      const local = loadProgress(bookId);
-      smbPath = local?.smbPath;
-      const localFraction = progressFraction(local);
-
-      // render the first page quickly not to block the UI
-      requestAnimationFrame(() => {
-        repaginate(localFraction);
-      });
-
-      const remoteConfigStartMs = performance.now();
-      const remote = await loadRemoteProgress(bookId);
-      if (remote !== null) {
-        const remoteConfigEndMs = performance.now();
-        console.log(
-          `Loaded remote progress for book ${bookId} in ${formatDuration(
-            remoteConfigEndMs - remoteConfigStartMs,
-          )}`,
-        );
-
-        const remoteFraction = progressFraction(remote);
-        if (remoteFraction > localFraction) {
-          // Only repaginate when the remote progress is further along than
-          // the local progress — otherwise a stale/unsynced remote copy
-          // would yank the reader backward past what they've already read.
-          requestAnimationFrame(() => {
-            repaginate(remoteFraction);
-          });
-        }
-      } else {
-        const remoteConfigEndMs = performance.now();
-        console.log(
-          `No remote progress for book ${bookId} could be found in ${formatDuration(
-            remoteConfigEndMs - remoteConfigStartMs,
-          )}`,
-        );
+    async function init() {
+      // Not awaited yet: loading/parsing the book is normally the slower of
+      // the two, so overlapping the wait here means pagination only ever
+      // has to happen once, directly at the resolved position.
+      const positionPromise = resolveInitialPosition();
+      const bookLoaded = await loadAndParseBook();
+      if (!bookLoaded) {
+        return;
       }
+      const position = await positionPromise;
+      smbPath = position.smbPath;
+
+      setStage('paginating');
+      await paginateOnNextFrame(position.fraction);
     }
 
     void init();
@@ -743,8 +740,13 @@ export function ReaderPage() {
     // not on iOS/iPadOS); repaginate is debounced, so the burst collapses
     // into a single rebuild.
     const handleResize = () => {
+      if (stage() !== 'ready') {
+        // Reacting here mid-restore would race with, and could cancel,
+        // init()'s pending pagination call.
+        return;
+      }
       const currentFraction = localPages().length > 1 ? pageIdx() / (localPages().length - 1) : 0;
-      batch(() => setReady(false));
+      setStage('paginating');
       repaginate(currentFraction);
     };
     window.addEventListener('resize', handleResize);

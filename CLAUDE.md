@@ -4,6 +4,7 @@
 
 - **Descriptive names > brevity** — a name that explains what something is or does is always better than a short one. Avoid abbreviations and single-letter variables outside of trivial loop counters.
 - **Correctness > cleverness** — prefer straightforward, readable code over compact or "clever" solutions. If a reader has to pause to understand it, rewrite it.
+- **Comments**: comments are added to explain why the logic has been added, why the code works one way and not another, why the code works when it looks like it won't, etc; comments that explain the "what" are redundant and require removal.
 
 ## Functions
 

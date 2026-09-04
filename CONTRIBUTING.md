@@ -89,3 +89,7 @@ Follow the phase naming from the plan:
 - `docs:` — documentation only
 - `test:` — tests only
 - `refactor:` — no behaviour change
+
+Other recommendations:
+
+- Include the summary of all committed changes

@@ -7,7 +7,51 @@ const progressCache: Record<string, Progress> = {};
 
 const LEGACY_PREFIX = 'polka:progress:';
 
+let pendingSync: Progress | null = null;
+
+function postProgress(progress: Progress, keepalive = false): void {
+  fetch(`${store.serverUrl}/api/progress`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(progress),
+    keepalive,
+  }).catch(() => {
+    // Remote sync is best-effort; failure is silent
+  });
+}
+
+const SYNC_INTERVAL_MS = 10_000;
+
+const throttledSync = throttle((progress: Progress) => {
+  postProgress(progress);
+  pendingSync = null;
+}, SYNC_INTERVAL_MS);
+
+function syncRemote(progress: Progress): void {
+  pendingSync = progress;
+  throttledSync(progress);
+}
+
+// A tab can be backgrounded or closed before the throttle window above
+// elapses — especially on iOS Safari — silently dropping the final reading
+// position. `keepalive` lets the flush request survive the teardown.
+function flushPendingSync(): void {
+  if (pendingSync === null) {
+    return;
+  }
+  const progress = pendingSync;
+  pendingSync = null;
+  postProgress(progress, true);
+}
+
 export async function initProgress(): Promise<void> {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      flushPendingSync();
+    }
+  });
+  window.addEventListener('pagehide', flushPendingSync);
+
   const progressArray = await ProgressDB.download();
 
   if (progressArray.length === 0) {
@@ -52,18 +96,6 @@ export function allProgress(): Progress[] {
   return Object.values(progressCache);
 }
 
-const SYNC_INTERVAL_MS = 10_000;
-
-const syncRemote = throttle((progress: Progress) => {
-  fetch(`${store.serverUrl}/api/progress`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(progress),
-  }).catch(() => {
-    // Remote sync is best-effort; failure is silent
-  });
-}, SYNC_INTERVAL_MS);
-
 const REMOTE_PROGRESS_TIMEOUT_MS = 10_000;
 
 export async function loadRemoteProgress(bookId: string): Promise<Progress | null> {
@@ -82,4 +114,28 @@ export async function loadRemoteProgress(bookId: string): Promise<Progress | nul
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+export function progressFraction(progress: Progress | null): number {
+  if (!progress || progress.totalPages <= 1) {
+    return 0;
+  }
+  return (progress.currentPage - 1) / (progress.totalPages - 1);
+}
+
+// Callers about to persist a progress record (e.g. HomePage's SMB-select
+// flow, to record a fresh smbPath) must use this instead of local progress
+// alone: on a device with no local record for the book yet, defaulting
+// page/percent to 0 would overwrite real progress on the server with a
+// zeroed-out one, since the server does a full-file overwrite, not a merge.
+export async function resolveBestProgress(bookId: string): Promise<Progress | null> {
+  const local = loadProgress(bookId);
+  const remote = await loadRemoteProgress(bookId);
+  if (remote === null) {
+    return local;
+  }
+  if (local === null) {
+    return remote;
+  }
+  return progressFraction(remote) > progressFraction(local) ? remote : local;
 }

@@ -76,13 +76,23 @@ export function NasConfigurationSettings() {
     navigate('/');
   }
 
+  function handleSubmit(event: SubmitEvent) {
+    event.preventDefault();
+    void handleSave();
+  }
+
   return (
-    <>
+    // Using form with name/id/autocomplete on every field to be recognised by
+    // password managers for autofill
+    <form id="nas-config-form" autocomplete="on" onSubmit={handleSubmit}>
       <div class="field">
-        <label>{i18n('settings.serverUrlLabel')}</label>
+        <label for="server-url">{i18n('settings.serverUrlLabel')}</label>
         <input
+          id="server-url"
+          name="server-url"
           type="url"
           inputmode="url"
+          autocomplete="url"
           placeholder={i18n('settings.serverUrlPlaceholder')}
           value={serverUrl()}
           onInput={(event) => setServerUrl(event.currentTarget.value)}
@@ -90,28 +100,36 @@ export function NasConfigurationSettings() {
         <p class="field-hint">{i18n('settings.serverUrlHint')}</p>
       </div>
       <div class="field">
-        <label>{i18n('settings.ipAddressLabel')}</label>
+        <label for="nas-ip-address">{i18n('settings.ipAddressLabel')}</label>
         <input
+          id="nas-ip-address"
+          name="ip-address"
           type="text"
           inputmode="url"
+          autocomplete="on"
           placeholder={i18n('settings.ipAddressPlaceholder')}
           value={ip()}
           onInput={(event) => setIp(event.currentTarget.value)}
         />
       </div>
       <div class="field">
-        <label>{i18n('settings.portLabel')}</label>
+        <label for="nas-port">{i18n('settings.portLabel')}</label>
         <input
+          id="nas-port"
+          name="port"
           type="number"
           inputmode="numeric"
+          autocomplete="on"
           placeholder={i18n('settings.portPlaceholder')}
           value={port()}
           onInput={(event) => setPort(event.currentTarget.value)}
         />
       </div>
       <div class="field">
-        <label>{i18n('settings.usernameLabel')}</label>
+        <label for="nas-username">{i18n('settings.usernameLabel')}</label>
         <input
+          id="nas-username"
+          name="username"
           type="text"
           autocomplete="username"
           placeholder={i18n('settings.usernamePlaceholder')}
@@ -120,8 +138,10 @@ export function NasConfigurationSettings() {
         />
       </div>
       <div class="field">
-        <label>{i18n('settings.passwordLabel')}</label>
+        <label for="nas-password">{i18n('settings.passwordLabel')}</label>
         <input
+          id="nas-password"
+          name="password"
           type="password"
           autocomplete="current-password"
           placeholder={
@@ -134,9 +154,12 @@ export function NasConfigurationSettings() {
         />
       </div>
       <div class="field">
-        <label>{i18n('settings.shareNameLabel')}</label>
+        <label for="nas-share-name">{i18n('settings.shareNameLabel')}</label>
         <input
+          id="nas-share-name"
+          name="share"
           type="text"
+          autocomplete="on"
           placeholder={i18n('settings.shareNamePlaceholder')}
           value={share()}
           onInput={(event) => setShare(event.currentTarget.value)}
@@ -150,18 +173,23 @@ export function NasConfigurationSettings() {
       </Show>
 
       <div class="settings-actions">
-        <button class="btn-secondary" onClick={() => void handleTest()} disabled={busy()}>
+        <button
+          type="button"
+          class="btn-secondary"
+          onClick={() => void handleTest()}
+          disabled={busy()}
+        >
           {busy() ? i18n('settings.testingButton') : i18n('settings.testConnectionButton')}
         </button>
-        <button class="btn" onClick={() => void handleSave()}>
+        <button type="submit" class="btn">
           {i18n('settings.saveButton')}
         </button>
         <Show when={existing()}>
-          <button class="btn-danger" onClick={() => void handleClear()}>
+          <button type="button" class="btn-danger" onClick={() => void handleClear()}>
             {i18n('settings.disconnectNasButton')}
           </button>
         </Show>
       </div>
-    </>
+    </form>
   );
 }

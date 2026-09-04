@@ -789,6 +789,10 @@ h5.reader-section-title {
 
 .settings-form {
   padding: 8px 0;
+}
+
+.settings-form,
+.settings-form > form {
   display: flex;
   flex-direction: column;
   gap: 16px;

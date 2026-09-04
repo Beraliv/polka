@@ -3,6 +3,7 @@ import { Router } from '@solidjs/router';
 import { registerSW } from 'virtual:pwa-register';
 import { App } from './App.tsx';
 import { initProgress } from './lib/progress.ts';
+import { BookStore } from './store/books.ts';
 import './styles.css';
 
 const SERVICE_WORKER_UPDATE_INTERVAL_MS = 60 * 60 * 1000;
@@ -37,4 +38,5 @@ initProgress().then(() => {
     ),
     root,
   );
+  void BookStore.loadSMBStatus();
 });

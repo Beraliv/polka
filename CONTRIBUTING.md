@@ -16,14 +16,16 @@ pnpm install            # install all workspace deps
 ## Running locally
 
 ```bash
-pnpm dev
+docker compose up --build
 ```
 
-Starts both apps in parallel:
-- **Client** — Vite dev server at `http://localhost:3000` (HMR enabled)
-- **Server** — Node 24 with `--watch --experimental-strip-types` at `http://localhost:3001`
+Starts both containers:
+- **Client** — nginx serving the built SPA at `http://localhost:8080` (override with `CLIENT_PORT`), proxying `/api` to the server internally
+- **Server** — the built Node.js API, on `http://localhost:3001` (override with `SERVER_PORT`)
 
-The client Vite config proxies `/api` requests to the server, so you only need to open `http://localhost:3000`.
+Docker Compose reads a `.env` file in the repo root automatically (see `.env.example`) — use it for `SMB_CONFIG_ENCRYPTION_KEY`, `ALLOWED_ORIGIN`, etc.
+
+This isn't a hot-reloading dev server: after changing code, stop it (`Ctrl+C`) and re-run `docker compose up --build` to see the change. Tests and type checking below still run directly with the local Node install, not through Docker.
 
 ## Project structure
 

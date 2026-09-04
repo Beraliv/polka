@@ -37,7 +37,7 @@ const allowedOrigins = process.env.ALLOWED_ORIGIN
 
 await app.register(cors, {
   origin: allowedOrigins.length > 0 ? allowedOrigins : false,
-  methods: ['GET', 'POST', 'OPTIONS'],
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type'],
   optionsSuccessStatus: 204,
 });

@@ -22,7 +22,7 @@ On startup the server logs `Server listening on http://0.0.0.0:3001` — if that
 Easiest first: open Polka's **Settings (⚙)** page — the footer shows the client and server versions — or query the server directly:
 
 ```bash
-curl http://<nas-ip>:3000/api/version   # e.g. {"version":"0.1.0"}
+curl http://<nas-ip>:8080/api/version   # e.g. {"version":"0.1.0"}
 ```
 
 The app pulls `:latest`, so the image tag alone doesn't say which build is live. To verify at the Docker level, compare digests:
@@ -39,7 +39,7 @@ The client's nginx proxies `/api` to `server:3001` over the internal network; th
 
 ```bash
 # Through nginx (what the browser uses) — expect {"error":"not found"}
-curl http://<nas-ip>:3000/api/progress/test
+curl http://<nas-ip>:3001/api/progress/test
 
 # From inside the client container, straight to the server
 sudo docker exec ix-polka-client-1 curl -s http://server:3001/api/progress/test

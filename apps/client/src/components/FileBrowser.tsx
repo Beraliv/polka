@@ -1,5 +1,5 @@
 import { createSignal, For, Show, onMount } from 'solid-js';
-import type { SMBConfig, FileEntry } from '@polka/shared';
+import type { FileEntry } from '@polka/shared';
 import { listSMBFiles } from '../lib/api';
 import { BookIcon } from './BookIcon.tsx';
 import { ChevronLeftIcon } from './ChevronLeftIcon.tsx';
@@ -9,7 +9,6 @@ import { FolderIcon } from './FolderIcon.tsx';
 import { i18n } from '../i18n';
 
 type Props = {
-  config: SMBConfig;
   onClose: () => void;
   onSelect: (path: string, filename: string) => void;
 };
@@ -34,7 +33,7 @@ export function FileBrowser(props: Props) {
     setLoading(true);
     setError('');
     try {
-      const files = await listSMBFiles(props.config, path);
+      const files = await listSMBFiles(path);
       setEntries(
         [...files].sort((first, second) => {
           if (first.isDirectory !== second.isDirectory) {

@@ -36,14 +36,23 @@ See [docs/features.md](docs/features.md) for a detailed FB2 vs EPUB support matr
 ```bash
 git clone https://github.com/Beraliv/polka
 cd polka
-nvm install                         # installs recommended node version (unless it's already installed)
-nvm use                             # chooses recommended node version
-kill $(lsof -ti :3000 -ti :3001)    # stop previous runs
-pnpm install
-pnpm dev                            # client → http://localhost:3000  server → http://localhost:3001
+
+# Optional: bind-mount progress/SMB data to ./data so it's visible on the host
+# (skip this to use Docker-managed named volumes instead)
+cat > docker-compose.override.yml <<'EOF'
+services:
+  server:
+    volumes:
+      - ./data/progress:/data/progress
+      - ./data/smb:/data/smb
+EOF
+
+docker compose up --build
 ```
 
-Open `http://localhost:3000`, tap **Add from device** to open a local `.epub` or `.fb2` file.
+Open `http://localhost:8080`, tap **Add from device** to open a local `.epub` or `.fb2` file. Override the port with the `CLIENT_PORT` env var (e.g. in a `.env` file — see `.env.example`).
+
+Docker rebuilds the images on every `--build`, so this doesn't hot-reload — re-run `docker compose up --build` after code changes. See [CONTRIBUTING.md](CONTRIBUTING.md) for running tests, which still need a local Node install.
 
 ## NAS / TrueNAS deployment
 
@@ -51,9 +60,11 @@ Open `http://localhost:3000`, tap **Add from device** to open a local `.epub` or
 docker compose up --build -d
 ```
 
-The client is served on **port 80**. API requests are proxied from nginx to the Node.js server on port 3001.
+The client is served on **port 8080** by default (override with `CLIENT_PORT`). API requests are proxied from nginx to the Node.js server on port 3001.
 
 Progress JSON files are stored in a named Docker volume (`progress_data`) mounted at `/data/progress` inside the server container. Override the path with the `PROGRESS_PATH` env var.
+
+SMB configuration is stored in a named Docker volume (`smb_config_data`) mounted at `/data/smb` inside the server container. Override the path with the `SMB_CONFIG_PATH` env var. The SMB password is AES-256-GCM encrypted before it's written; by default the server generates and stores its own key alongside the config, or you can supply your own via the `SMB_CONFIG_ENCRYPTION_KEY` env var for stronger protection (e.g. `openssl rand -hex 32`, kept outside the volume).
 
 ### TrueNAS SCALE
 
@@ -83,7 +94,7 @@ The app opens full-screen without browser chrome. Books and progress are stored 
 3. Tap **Test Connection** to verify, then **Save**
 4. Back on the home screen, tap **Add from NAS** to pick a book
 
-The password is saved to localStorage so the NAS reconnects automatically on reload. Books downloaded from the NAS are cached in IndexedDB and reopen instantly without re-downloading.
+Your NAS credentials are stored on the server, not in the browser, so the connection persists across devices and reloads without ever putting the password in client-side storage. The password is encrypted at rest on the server (see [NAS / TrueNAS deployment](#nas--truenas-deployment)). Books downloaded from the NAS are cached in IndexedDB and reopen instantly without re-downloading.
 
 ## Tech stack
 

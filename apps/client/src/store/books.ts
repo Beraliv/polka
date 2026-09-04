@@ -1,11 +1,23 @@
 import { createStore } from 'solid-js/store';
-import type { Book, SMBConfig } from '@polka/shared';
+import type { Book, SMBConfig, SMBConfigSummary } from '@polka/shared';
 import type { SectionItem, TocEntry, Note } from '../lib/book';
 import { BookFilesDB, ProgressDB } from '../lib/polka-db.ts';
+import {
+  fetchSMBConfig,
+  saveSMBConfig as saveSMBConfigApi,
+  deleteSMBConfig as deleteSMBConfigApi,
+} from '../lib/api';
 
 const BOOKS_KEY = 'polka:books';
-const SMB_KEY = 'polka:smb';
 const SERVER_URL_KEY = 'polka:server-url';
+/**
+ * @deprecated Older versions of the client stored the NAS password in localStorage
+ * under this key. It is no longer used. See https://github.com/Beraliv/polka/issues/7
+ *
+ * TODO: the logic with legacy smb key will be removed at next minor change of
+ * client, i.e. client@0.14.x
+ */
+const LEGACY_SMB_KEY = 'polka:smb';
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -16,9 +28,17 @@ function load<T>(key: string, fallback: T): T {
   }
 }
 
+try {
+  localStorage.removeItem(LEGACY_SMB_KEY);
+} catch {
+  // localStorage unavailable — nothing to clean up
+}
+
 const [store, setStore] = createStore({
   books: load<Book[]>(BOOKS_KEY, []),
-  smb: load<SMBConfig | null>(SMB_KEY, null),
+  // Populated asynchronously from the server via BookStore.loadSMBStatus() —
+  // never persisted client-side, so the NAS password never touches localStorage.
+  smbStatus: null as SMBConfigSummary | null,
   serverUrl: load<string>(SERVER_URL_KEY, ''),
   sections: {} as Record<string, SectionItem[]>,
   toc: {} as Record<string, TocEntry[]>,
@@ -139,21 +159,21 @@ export class BookStore {
     setStore('serverUrl', '');
   }
 
-  static saveSMBConfig(config: SMBConfig): void {
+  static async loadSMBStatus(): Promise<void> {
     try {
-      localStorage.setItem(SMB_KEY, JSON.stringify(config));
+      setStore('smbStatus', await fetchSMBConfig());
     } catch (error) {
-      console.error('[saveSMBConfig] Failed to save SMB config to local storage:', error);
+      console.error('[loadSMBStatus] Failed to load NAS status from server:', error);
     }
-    setStore('smb', config);
   }
 
-  static deleteSMBConfig(): void {
-    try {
-      localStorage.removeItem(SMB_KEY);
-    } catch (error) {
-      console.error('[deleteSMBConfig] Failed to delete SMB config from local storage:', error);
-    }
-    setStore('smb', null);
+  static async saveSMBConfig(config: Partial<SMBConfig>): Promise<void> {
+    const summary = await saveSMBConfigApi({ config });
+    setStore('smbStatus', summary);
+  }
+
+  static async deleteSMBConfig(): Promise<void> {
+    await deleteSMBConfigApi();
+    setStore('smbStatus', null);
   }
 }

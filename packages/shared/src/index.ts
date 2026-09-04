@@ -33,6 +33,18 @@ export type SMBConfig = {
   share: string;
 };
 
+/**
+ * SMBConfig without the password, the only shape the server ever sends to the client.
+ *
+ * TODO: Infer this type from the smbConfigSummarySchema instead of duplicating it here.
+ */
+export type SMBConfigSummary = {
+  ip: string;
+  port: number;
+  username: string;
+  share: string;
+};
+
 export type FileEntry = {
   name: string;
   path: string;

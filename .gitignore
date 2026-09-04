@@ -6,5 +6,8 @@ dist
 coverage
 .vercel
 apps/server/data/progress/
+apps/server/data/smb/
+docker-compose.override.yml
+/data/
 *.scratch.test.ts
 *.debug.test.ts

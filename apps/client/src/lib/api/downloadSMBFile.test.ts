@@ -1,26 +1,33 @@
 // @vitest-environment node
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { SMBConfig } from '@polka/shared';
 import { downloadSMBFile } from './downloadSMBFile.ts';
 
 vi.mock('../../store/books.ts', () => ({
   store: { serverUrl: 'http://store-server.test' },
 }));
 
-const config: SMBConfig = {
-  ip: '192.168.1.10',
-  port: 445,
-  username: 'reader',
-  password: 'secret',
-  share: 'books',
-};
-
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe('downloadSMBFile', () => {
+  it('sends only the path, no NAS config, in the request body', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await downloadSMBFile('/books/war-and-peace.epub');
+
+    expect(fetchMock).toHaveBeenCalledWith('http://store-server.test/api/smb/file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: '/books/war-and-peace.epub' }),
+    });
+  });
+
   it('returns the file contents as an ArrayBuffer', async () => {
     const fileContents = new ArrayBuffer(8);
     vi.stubGlobal(
@@ -31,13 +38,13 @@ describe('downloadSMBFile', () => {
       }),
     );
 
-    await expect(downloadSMBFile(config, '/books/war-and-peace.epub')).resolves.toBe(fileContents);
+    await expect(downloadSMBFile('/books/war-and-peace.epub')).resolves.toBe(fileContents);
   });
 
   it('throws when the server responds with an error', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
 
-    await expect(downloadSMBFile(config, '/books/missing.epub')).rejects.toThrow(
+    await expect(downloadSMBFile('/books/missing.epub')).rejects.toThrow(
       'Failed to download file from SMB',
     );
   });

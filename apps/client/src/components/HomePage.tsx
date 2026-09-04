@@ -121,14 +121,14 @@ export function HomePage() {
   }
 
   async function handleSMBSelect(path: string, filename: string) {
-    if (!store.smb) {
+    if (!store.smbStatus) {
       return;
     }
     setShowBrowser(false);
     setAdding(true);
     setAddError('');
     try {
-      const buffer = await downloadSMBFile(store.smb, path);
+      const buffer = await downloadSMBFile(path);
       const bookId = await processBook(buffer, filename);
       // Persist SMB path so re-download is possible after reload
       const previousProgress = loadProgress(bookId);
@@ -156,7 +156,7 @@ export function HomePage() {
   }
 
   async function reopenBook(bookId: string) {
-    if (!store.smb) {
+    if (!store.smbStatus) {
       setAddError(i18n('home.missingSmbConfigError'));
       return;
     }
@@ -176,7 +176,7 @@ export function HomePage() {
     setAddError('');
     try {
       const filename = progress.smbPath.split('\\').pop() ?? progress.smbPath;
-      const buffer = await downloadSMBFile(store.smb, progress.smbPath);
+      const buffer = await downloadSMBFile(progress.smbPath);
       await processBook(buffer, filename);
       navigate(`/reader/${bookId}`);
     } catch (error) {
@@ -271,7 +271,7 @@ export function HomePage() {
       />
 
       <div class="fab-area">
-        <Show when={store.smb}>
+        <Show when={store.smbStatus}>
           <button class="smb-btn" onClick={() => setShowBrowser(true)}>
             {i18n('home.addFromNasButton')}
           </button>
@@ -281,9 +281,8 @@ export function HomePage() {
         </button>
       </div>
 
-      <Show when={showBrowser() && store.smb}>
+      <Show when={showBrowser() && store.smbStatus}>
         <FileBrowser
-          config={store.smb!}
           onClose={() => setShowBrowser(false)}
           onSelect={(path, filename) => void handleSMBSelect(path, filename)}
         />

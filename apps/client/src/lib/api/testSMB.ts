@@ -11,13 +11,13 @@ export async function testSMB({
   config,
   serverUrl,
 }: {
-  config: SMBConfig;
+  config?: Partial<SMBConfig>;
   serverUrl?: string;
 }): Promise<void> {
   const res = await fetch(apiUrl('/api/smb/test', serverUrl ?? store.serverUrl), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(config),
+    body: JSON.stringify(config ?? {}),
   });
   if (!res.ok) {
     const { error } = errorResponseSchema.parse(await res.json());

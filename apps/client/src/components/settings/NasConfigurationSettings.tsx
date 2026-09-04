@@ -1,32 +1,48 @@
-import { createSignal, Show } from 'solid-js';
+import { createSignal, Show, onMount } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { store, BookStore } from '../../store/books.ts';
-import { testSMB } from '../../lib/api';
-import type { SMBConfig } from '@polka/shared';
+import { testSMB, fetchSMBConfig } from '../../lib/api';
+import type { SMBConfig, SMBConfigSummary } from '@polka/shared';
 import { i18n } from '../../i18n';
 
 export function NasConfigurationSettings() {
   const navigate = useNavigate();
-  const existing = store.smb;
 
+  const [existing, setExisting] = createSignal<SMBConfigSummary | null>(null);
   const [serverUrl, setServerUrl] = createSignal(store.serverUrl ?? '');
-  const [ip, setIp] = createSignal(existing?.ip ?? '');
-  const [port, setPort] = createSignal(String(existing?.port ?? 445));
-  const [username, setUsername] = createSignal(existing?.username ?? '');
+  const [ip, setIp] = createSignal('');
+  const [port, setPort] = createSignal('445');
+  const [username, setUsername] = createSignal('');
   const [password, setPassword] = createSignal('');
-  const [share, setShare] = createSignal(existing?.share ?? '');
+  const [share, setShare] = createSignal('');
   const [busy, setBusy] = createSignal(false);
   const [status, setStatus] = createSignal<'idle' | 'ok' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = createSignal('');
 
-  function buildConfig(): SMBConfig {
-    return {
+  onMount(() => {
+    void (async () => {
+      const summary = await fetchSMBConfig();
+      setExisting(summary);
+      if (summary) {
+        setIp(summary.ip);
+        setPort(String(summary.port));
+        setUsername(summary.username);
+        setShare(summary.share);
+      }
+    })();
+  });
+
+  function buildConfig(): Partial<SMBConfig> {
+    const config: Partial<SMBConfig> = {
       ip: ip().trim(),
       port: Number(port()) || 445,
       username: username().trim(),
-      password: password(),
       share: share().trim(),
     };
+    if (password()) {
+      config.password = password();
+    }
+    return config;
   }
 
   async function handleTest() {
@@ -44,23 +60,19 @@ export function NasConfigurationSettings() {
     }
   }
 
-  function handleSave() {
+  async function handleSave() {
     const url = serverUrl();
     if (url.trim()) {
       BookStore.saveServerUrl(url);
     } else {
       BookStore.deleteServerUrl();
     }
-    const config = buildConfig();
-    if (!config.password && existing?.password) {
-      config.password = existing.password;
-    }
-    BookStore.saveSMBConfig(config);
+    await BookStore.saveSMBConfig(buildConfig());
     navigate('/');
   }
 
-  function handleClear() {
-    BookStore.deleteSMBConfig();
+  async function handleClear() {
+    await BookStore.deleteSMBConfig();
     navigate('/');
   }
 
@@ -113,7 +125,7 @@ export function NasConfigurationSettings() {
           type="password"
           autocomplete="current-password"
           placeholder={
-            existing
+            existing()
               ? i18n('settings.passwordUpdatePlaceholder')
               : i18n('settings.passwordPlaceholder')
           }
@@ -141,11 +153,11 @@ export function NasConfigurationSettings() {
         <button class="btn-secondary" onClick={() => void handleTest()} disabled={busy()}>
           {busy() ? i18n('settings.testingButton') : i18n('settings.testConnectionButton')}
         </button>
-        <button class="btn" onClick={handleSave}>
+        <button class="btn" onClick={() => void handleSave()}>
           {i18n('settings.saveButton')}
         </button>
-        <Show when={existing}>
-          <button class="btn-danger" onClick={handleClear}>
+        <Show when={existing()}>
+          <button class="btn-danger" onClick={() => void handleClear()}>
             {i18n('settings.disconnectNasButton')}
           </button>
         </Show>

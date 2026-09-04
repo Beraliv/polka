@@ -7,11 +7,14 @@ services:
       PORT: "3001"
       HOST: "0.0.0.0"
       PROGRESS_PATH: "/data/progress"
+      SMB_CONFIG_PATH: "/data/smb"
+      SMB_CONFIG_ENCRYPTION_KEY: "${SMB_CONFIG_ENCRYPTION_KEY:-}"
       ALLOWED_ORIGIN: "${ALLOWED_ORIGIN:-}"
     ports:
       - "${SERVER_PORT:-3001}:3001"
     volumes:
       - progress_data:/data/progress
+      - smb_config_data:/data/smb
     restart: unless-stopped
 
   client:
@@ -19,10 +22,11 @@ services:
       context: .
       dockerfile: apps/client/Dockerfile
     ports:
-      - "80:80"
+      - "${CLIENT_PORT:-8080}:80"
     depends_on:
       - server
     restart: unless-stopped
 
 volumes:
   progress_data:
+  smb_config_data:

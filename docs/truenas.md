@@ -7,6 +7,7 @@ Polka runs as a two-container custom app on TrueNAS SCALE: the client (nginx ser
 - TrueNAS SCALE **24.10 (Electric Eel) or newer** — these versions run apps on Docker and support compose YAML. See the [official custom app docs](https://apps.truenas.com/managing-apps/installing-custom-apps/).
 - An apps pool configured (**Apps → Settings → Choose Pool**).
 - A dataset (or directory) on a pool for the reading-progress files, e.g. `/mnt/<pool>/apps/polka/progress` (**Datasets → Add Dataset**).
+- A second dataset (or directory) for the SMB configuration file, e.g. `/mnt/<pool>/apps/polka/smb`.
 
 TrueNAS pulls the prebuilt images [`beraliv/polka-server`](https://hub.docker.com/r/beraliv/polka-server) and [`beraliv/polka-client`](https://hub.docker.com/r/beraliv/polka-client), published to Docker Hub by CI (`linux/amd64`); it does not build from source.
 
@@ -14,7 +15,7 @@ TrueNAS pulls the prebuilt images [`beraliv/polka-server`](https://hub.docker.co
 
 1. In the TrueNAS UI, go to **Apps → Discover Apps**.
 2. Open the **⋮** menu next to the **Custom App** button and choose **Install via YAML**.
-3. Set **Name** to `polka` and paste the config below (replace `/mnt/<pool>/apps/polka/progress` with your dataset path):
+3. Set **Name** to `polka` and paste the config below (replace `/mnt/<pool>/apps/polka/progress` and `/mnt/<pool>/apps/polka/smb` with your dataset paths):
 
 ```yaml
 services:
@@ -30,19 +31,38 @@ services:
       HOST: 0.0.0.0
       PORT: '3001'
       PROGRESS_PATH: /data/progress
+      SMB_CONFIG_PATH: /data/smb
     image: beraliv/polka-server:latest
     restart: unless-stopped
     volumes:
       - /mnt/<pool>/apps/polka/progress:/data/progress
+      - /mnt/<pool>/apps/polka/smb:/data/smb
 ```
 
 4. Click **Save**. TrueNAS pulls the images and starts both containers; the app appears as **Running** under **Apps → Installed**.
 
-Differences from the repo's `docker-compose.yml`, and why:
+Client is on `8080:80` rather than `80:80` because the TrueNAS web UI itself occupies port 80/443 — any free port works, and it happens to match the repo's `docker-compose.yml` default (`CLIENT_PORT`) too.
 
-- **Client on `8080:80`, not `80:80`** — the TrueNAS web UI occupies port 80/443, so binding 80 fails. Any free port works.
+Other differences from the repo's `docker-compose.yml`, and why:
+
 - **No `ports:` on the server** — nginx in the client container proxies `/api` to `server:3001` over the internal network, so the API never needs host exposure.
 - **Host path for progress, not a named volume** — reading progress is stored as JSON files, and mounting a dataset path keeps them visible on the pool, easy to back up (snapshots/replication), and safe across app reinstalls. A named Docker volume (what `docker-compose.yml` uses) would hide them inside Docker's storage and tie them to the app's lifecycle.
+- **Same reasoning for the SMB config dataset** — the server persists your NAS connection settings to a JSON file at `SMB_CONFIG_PATH`, the same way it persists progress. This keeps your NAS password off the client (browser `localStorage`) entirely. The password itself is AES-256-GCM encrypted before it's written; see [**Encrypting the SMB password**](#encrypting-the-smb-password) below.
+
+## Encrypting the SMB password
+
+By default the server encrypts the SMB password with a key it generates on first use and stores as a `key` file next to `config.json` in the SMB config dataset — the password is never written in raw form, but anyone with read access to that dataset can read the key file too.
+
+For real protection, supply your own key via the `SMB_CONFIG_ENCRYPTION_KEY` environment variable, kept outside the dataset (e.g. pasted only into the app's YAML config, not stored on the pool). Generate one with `openssl rand -hex 32` and add it to the `environment:` block:
+
+```yaml
+services:
+  server:
+    environment:
+      SMB_CONFIG_ENCRYPTION_KEY: '<paste the generated value here>'
+```
+
+Set it once, before saving your NAS credentials in Settings — changing it later makes any previously saved config undecryptable, and you'll need to re-enter your NAS credentials.
 
 ## 2. Verify
 

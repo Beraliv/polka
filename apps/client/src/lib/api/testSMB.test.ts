@@ -47,4 +47,16 @@ describe('testSMB', () => {
 
     await expect(testSMB({ config })).rejects.toThrow('Access denied');
   });
+
+  it('sends an empty body when no config is given, to test the persisted NAS config', async () => {
+    const fetchMock = mockFetchResponse({ ok: true });
+
+    await testSMB({ serverUrl: 'http://nas.local:3001' });
+
+    expect(fetchMock).toHaveBeenCalledWith('http://nas.local:3001/api/smb/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+  });
 });

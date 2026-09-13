@@ -27,7 +27,7 @@ export const en = {
   bookCard: {
     coverAlt: 'Cover of $bookName',
     finished: 'Finished',
-    pageOfTotal: 'Page $currentPage of $totalPages',
+    pageOfTotal: 'Page $currentPage of $totalPages, $percent%',
     redownloadTooltip: 'Tap to re-download from NAS',
     removeTooltip: 'Remove',
     totalPages: '$totalPages pages',

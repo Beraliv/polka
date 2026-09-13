@@ -819,7 +819,6 @@ export function ReaderPage() {
   const secondPage = () => localPages()[pageIdx() + 1] ?? [];
   const total = () => localPages().length;
   const lastVisiblePageNumber = () => Math.min(pageIdx() + pageStep(), total());
-  const percent = () => (total() > 0 ? Math.round((lastVisiblePageNumber() / total()) * 100) : 0);
   const pageRangeLabel = () => {
     const firstPageNumber = pageIdx() + 1;
     const lastPageNumber = lastVisiblePageNumber();
@@ -908,21 +907,6 @@ export function ReaderPage() {
               </Show>
             </div>
           </Show>
-        </div>
-      </div>
-
-      <div class="reader-footer" style={{ visibility: ready() ? 'visible' : 'hidden' }}>
-        <div class="reader-progress-wrap">
-          <div
-            class="reader-progress-bar"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={percent()}
-          >
-            <div class="reader-progress-fill" style={{ width: `${percent()}%` }} />
-          </div>
-          <div class="reader-percent">{percent()}%</div>
         </div>
       </div>
 

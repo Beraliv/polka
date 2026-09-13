@@ -75,6 +75,7 @@ export function BookCard(props: Props) {
                   : i18n('bookCard.pageOfTotal', {
                       currentPage: bookProgress().currentPage,
                       totalPages: bookProgress().totalPages,
+                      percent: bookProgress().percent,
                     })}
               </div>
             </>

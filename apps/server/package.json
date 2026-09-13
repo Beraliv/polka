@@ -1,11 +1,11 @@
 {
   "name": "@polka/server",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
-    "start": "ALLOWED_ORIGIN=https://polka-zeta.vercel.app NODE_OPTIONS=--openssl-legacy-provider node dist/index.js",
+    "start": "ALLOWED_ORIGIN=https://polka-demo.vercel.app NODE_OPTIONS=--openssl-legacy-provider node dist/index.js",
     "test": "vitest run --passWithNoTests",
     "lint": "oxlint . && oxfmt --check",
     "format": "oxlint . --fix && oxfmt"

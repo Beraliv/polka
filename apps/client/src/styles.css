@@ -18,6 +18,8 @@
   --success: #4ade80;
   --border: #334155;
   --radius: 12px;
+  --page-horizontal-gap: 2rem;
+  --page-vertical-gap: 1.75rem;
 }
 
 html,
@@ -74,14 +76,14 @@ a {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 0 2rem 96px;
+  padding: 0 var(--page-horizontal-gap) 96px;
 }
 
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 0 16px;
+  padding: var(--page-vertical-gap) 0 16px;
   position: sticky;
   top: 0;
   background: var(--bg);
@@ -290,9 +292,10 @@ a {
 /* ---- FAB ---- */
 
 .fab-area {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
+  /* Use absolute positioning to make it relative to the page container */
+  position: absolute;
+  bottom: var(--page-vertical-gap);
+  right: var(--page-horizontal-gap);
   display: flex;
   flex-direction: column;
   align-items: flex-end;

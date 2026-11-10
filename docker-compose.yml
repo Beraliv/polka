@@ -10,6 +10,7 @@ services:
       SMB_CONFIG_PATH: "/data/smb"
       SMB_CONFIG_ENCRYPTION_KEY: "${SMB_CONFIG_ENCRYPTION_KEY:-}"
       ALLOWED_ORIGIN: "${ALLOWED_ORIGIN:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     ports:
       - "${SERVER_PORT:-3001}:3001"
     volumes:

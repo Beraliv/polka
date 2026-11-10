@@ -9,6 +9,7 @@ import { join, dirname } from 'path';
 import { smbRoutes } from './routes/smb.ts';
 import { progressRoutes } from './routes/progress.ts';
 import { versionRoutes } from './routes/version.ts';
+import { chatRoutes } from './routes/chat.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -52,6 +53,7 @@ await app.register(staticFiles, {
 await app.register(smbRoutes, { prefix: '/api/smb' });
 await app.register(progressRoutes, { prefix: '/api/progress' });
 await app.register(versionRoutes, { prefix: '/api/version' });
+await app.register(chatRoutes, { prefix: '/api/chat' });
 
 // SPA fallback — serve index.html for unknown routes in production
 app.setNotFoundHandler(async (_req, reply) => {

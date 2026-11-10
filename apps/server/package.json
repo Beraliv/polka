@@ -1,6 +1,6 @@
 {
   "name": "@polka/server",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,6 +11,7 @@
     "format": "oxlint . --fix && oxfmt"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
     "@fastify/cors": "^10.0.2",
     "@fastify/static": "^8.0.3",
     "@marsaud/smb2": "^0.18.0",

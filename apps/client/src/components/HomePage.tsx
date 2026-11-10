@@ -2,6 +2,7 @@ import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
 import { A, useNavigate } from '@solidjs/router';
 import { LibraryIcon } from './LibraryIcon.tsx';
 import { SettingsIcon } from './SettingsIcon.tsx';
+import { ChatIcon } from './ChatIcon.tsx';
 import { store, BookStore } from '../store/books.ts';
 import { parseBook, computeBookId, createCoverThumbnail } from '../lib/book';
 import { downloadSMBFile } from '../lib/api';
@@ -191,14 +192,24 @@ export function HomePage() {
     <div class="page">
       <div class="page-header">
         <h1 class="page-title">{i18n('home.appTitle')}</h1>
-        <A
-          href="/settings"
-          class="icon-btn"
-          title={i18n('home.settingsTooltip')}
-          aria-label={i18n('home.settingsTooltip')}
-        >
-          <SettingsIcon />
-        </A>
+        <div class="page-header-actions">
+          <A
+            href="/chat"
+            class="icon-btn"
+            title={i18n('home.chatTooltip')}
+            aria-label={i18n('home.chatTooltip')}
+          >
+            <ChatIcon />
+          </A>
+          <A
+            href="/settings"
+            class="icon-btn"
+            title={i18n('home.settingsTooltip')}
+            aria-label={i18n('home.settingsTooltip')}
+          >
+            <SettingsIcon />
+          </A>
+        </div>
       </div>
 
       <Show when={adding()}>

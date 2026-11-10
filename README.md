@@ -28,6 +28,7 @@ A mobile-first e-book reader for EPUB and FB2 files, designed to run on TrueNAS.
 - **Installable as a PWA** — add to home screen; app shell works offline
 - **Installable on TrueNAS SCALE** via Docker Compose
 - **Developer settings** — a "Force Restart" option reloads the app right away, useful if it feels stuck after an update
+- **Chat with Claude** — a built-in chat page (Anthropic's Claude API) for translations, questions, or anything else, with plain-text replies streamed token-by-token; a short notice explains when a reply was cut off for length or Claude declined to answer. Requires an `ANTHROPIC_API_KEY` on the server
 
 See [docs/features.md](docs/features.md) for a detailed FB2 vs EPUB support matrix.
 

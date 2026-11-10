@@ -5,3 +5,4 @@ export { downloadSMBFile } from './downloadSMBFile.ts';
 export { fetchSMBConfig } from './fetchSMBConfig.ts';
 export { saveSMBConfig } from './saveSMBConfig.ts';
 export { deleteSMBConfig } from './deleteSMBConfig.ts';
+export { sendChatMessage } from './sendChatMessage.ts';

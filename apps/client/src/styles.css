@@ -128,6 +128,12 @@ a {
   background: var(--surface);
 }
 
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* ---- BookCard ---- */
 
 .book-card {
@@ -1040,4 +1046,81 @@ h5.reader-section-title {
 .app-credit-heart {
   color: var(--danger);
   vertical-align: -1px;
+}
+
+/* ---- ChatPage ---- */
+
+.chat-page {
+  padding-bottom: 16px;
+}
+
+.chat-messages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.chat-message {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-message-user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: #fff;
+}
+
+.chat-message-assistant {
+  align-self: flex-start;
+  background: var(--surface);
+}
+
+.chat-notice {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.chat-input-area {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.chat-textarea {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1rem;
+  resize: none;
+  outline: none;
+  transition: border-color 0.15s;
+  max-height: 120px;
+}
+
+.chat-textarea:focus {
+  border-color: var(--accent);
+}
+
+.chat-textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.chat-send-btn {
+  width: auto;
+  flex-shrink: 0;
+  padding: 12px 18px;
 }

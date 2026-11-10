@@ -14,6 +14,7 @@ export const en = {
     addFromDeviceButton: 'Add from device',
     addFromNasButton: 'Add from NAS',
     appTitle: 'Polka',
+    chatTooltip: 'Chat with Claude',
     emptyStateText: 'No books yet — tap "$addFromDevice" or "$addFromNas" to add one',
     finishedShelfHeading: 'Finished',
     missingSmbConfigError:
@@ -23,6 +24,16 @@ export const en = {
     readingShelfHeading: 'Reading',
     settingsTooltip: 'Settings',
     unsupportedFormatError: 'Only EPUB and FB2 files are supported',
+  },
+  chat: {
+    backTooltip: 'Back',
+    emptyStateText:
+      'Ask Claude anything — translations, book recommendations, or general questions.',
+    placeholder: 'Message Claude…',
+    replyCutOffNotice: 'The reply was cut off because it got too long.',
+    replyDeclinedNotice: 'Claude declined to answer this message.',
+    sendButton: 'Send',
+    title: 'Chat',
   },
   bookCard: {
     coverAlt: 'Cover of $bookName',

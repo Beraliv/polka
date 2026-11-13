@@ -129,6 +129,20 @@ describe('SelectionManager', () => {
   });
 });
 
+describe('SelectionManager.takeSelectedText', () => {
+  it('returns the selected text and closes the selection, only once', () => {
+    const paragraphEl = buildParagraphEl('The quick brown fox');
+    stubPointAt({ paragraphEl, offset: 6 });
+    const manager = new SelectionManager();
+    manager.selectWordAtPoint(0, 0);
+
+    expect(manager.takeSelectedText()).toBe('quick');
+    expect(manager.selection).toBeNull();
+    // A tap fires both touchend and click on the toolbar button.
+    expect(manager.takeSelectedText()).toBe('');
+  });
+});
+
 describe('SelectionManager.selectByPointerDrag', () => {
   it('selects from the press point to the release point with a mouse', () => {
     const paragraphEl = buildParagraphEl('The quick brown fox');

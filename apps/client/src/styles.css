@@ -680,6 +680,111 @@ h5.reader-section-title {
   flex-shrink: 0;
 }
 
+/* ---- Explanation sheet ---- */
+
+.explanation-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 400;
+}
+
+.explanation-sheet {
+  background: var(--surface);
+  border-radius: var(--radius) var(--radius) 0 0;
+  width: 100%;
+  max-width: 600px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4);
+  /* Springs back when a swipe down is let go too early. */
+  transition: transform 0.2s ease-out;
+}
+
+.explanation-sheet.dragging {
+  transition: none;
+}
+
+/* The swipe-down area: the browser must not claim the vertical drag as a
+   scroll, or it cancels the pointer mid-swipe. */
+.explanation-header {
+  touch-action: none;
+  padding: 8px 1rem 4px;
+  cursor: grab;
+}
+
+.explanation-grabber {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface2);
+  margin: 0 auto 8px;
+}
+
+.explanation-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.explanation-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.explanation-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 1rem calc(env(safe-area-inset-bottom, 0px) + 1.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.explanation-passage {
+  border-inline-start: 3px solid var(--accent);
+  padding-inline-start: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.explanation-text {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.explanation-status {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.explanation-error {
+  color: var(--danger);
+}
+
+/* ---- Settings: explanation language ---- */
+
+.settings-option {
+  cursor: pointer;
+}
+
+.settings-option input {
+  accent-color: var(--accent);
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
 /* ---- Footnote references & popup ---- */
 
 .footnote-ref {

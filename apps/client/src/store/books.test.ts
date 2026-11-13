@@ -102,3 +102,29 @@ describe('legacy SMB localStorage cleanup', () => {
     expect(localStorage.getItem('polka:smb')).toBeNull();
   });
 });
+
+describe('explanation language', () => {
+  it('defaults to English', async () => {
+    const { store } = await import('./books.ts');
+
+    expect(store.explanationLanguage).toBe('en');
+  });
+
+  it('is saved and restored on the next load', async () => {
+    const { BookStore } = await import('./books.ts');
+    BookStore.saveExplanationLanguage('uk');
+    vi.resetModules();
+
+    const { store } = await import('./books.ts');
+
+    expect(store.explanationLanguage).toBe('uk');
+  });
+
+  it('falls back to English for a stored language this version does not support', async () => {
+    localStorage.setItem('polka:explanation-language', JSON.stringify('xx'));
+
+    const { store } = await import('./books.ts');
+
+    expect(store.explanationLanguage).toBe('en');
+  });
+});

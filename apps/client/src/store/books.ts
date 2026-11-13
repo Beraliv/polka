@@ -1,5 +1,12 @@
 import { createStore } from 'solid-js/store';
-import type { Book, SMBConfig, SMBConfigSummary } from '@polka/shared';
+import {
+  DEFAULT_EXPLANATION_LANGUAGE,
+  isExplanationLanguageCode,
+  type Book,
+  type ExplanationLanguageCode,
+  type SMBConfig,
+  type SMBConfigSummary,
+} from '@polka/shared';
 import type { SectionItem, TocEntry, Note } from '../lib/book';
 import { BookFilesDB, ProgressDB } from '../lib/polka-db.ts';
 import {
@@ -10,6 +17,7 @@ import {
 
 const BOOKS_KEY = 'polka:books';
 const SERVER_URL_KEY = 'polka:server-url';
+const EXPLANATION_LANGUAGE_KEY = 'polka:explanation-language';
 /**
  * @deprecated Older versions of the client stored the NAS password in localStorage
  * under this key. It is no longer used. See https://github.com/Beraliv/polka/issues/7
@@ -28,6 +36,13 @@ function load<T>(key: string, fallback: T): T {
   }
 }
 
+// A stored code this version doesn't support (e.g. saved by a newer client
+// that offered more languages) falls back to the default.
+function loadExplanationLanguage(): ExplanationLanguageCode {
+  const stored = load<unknown>(EXPLANATION_LANGUAGE_KEY, DEFAULT_EXPLANATION_LANGUAGE);
+  return isExplanationLanguageCode(stored) ? stored : DEFAULT_EXPLANATION_LANGUAGE;
+}
+
 try {
   localStorage.removeItem(LEGACY_SMB_KEY);
 } catch {
@@ -40,6 +55,7 @@ const [store, setStore] = createStore({
   // never persisted client-side, so the NAS password never touches localStorage.
   smbStatus: null as SMBConfigSummary | null,
   serverUrl: load<string>(SERVER_URL_KEY, ''),
+  explanationLanguage: loadExplanationLanguage(),
   sections: {} as Record<string, SectionItem[]>,
   toc: {} as Record<string, TocEntry[]>,
   notes: {} as Record<string, Record<string, Note>>,
@@ -157,6 +173,18 @@ export class BookStore {
       console.error('[deleteServerUrl] Failed to delete server URL from local storage:', error);
     }
     setStore('serverUrl', '');
+  }
+
+  static saveExplanationLanguage(language: ExplanationLanguageCode): void {
+    try {
+      localStorage.setItem(EXPLANATION_LANGUAGE_KEY, JSON.stringify(language));
+    } catch (error) {
+      console.error(
+        '[saveExplanationLanguage] Failed to save explanation language to local storage:',
+        error,
+      );
+    }
+    setStore('explanationLanguage', language);
   }
 
   static async loadSMBStatus(): Promise<void> {

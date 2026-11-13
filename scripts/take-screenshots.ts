@@ -39,6 +39,13 @@ const chatReply =
   'All happy families are alike; each unhappy family is unhappy in its own way. ' +
   "It's the opening line of Anna Karenina by Leo Tolstoy.";
 
+// Explains the sentence selectTextByTouch selects, in the default language.
+const explanationReply =
+  'Stepan Arkadyich Oblonsky walks into the dining room of the restaurant where he has brought ' +
+  'Levin for lunch. He takes off his coat but keeps his hat tilted on his head, and gives orders ' +
+  'to the waiters crowding around him.\n\n' +
+  "In the best Moscow restaurants of the time, waiters were often Tatars in tailcoats with napkins over their arms. The scene shows how at home Oblonsky feels in this world of comfort and good dinners, while Levin feels out of place in it.";
+
 async function readVersion(app: 'client' | 'server'): Promise<string> {
   const packageJson = JSON.parse(
     await readFile(join(repoRoot, 'apps', app, 'package.json'), 'utf-8'),
@@ -84,6 +91,16 @@ async function answerApiRequest(route: Route, serverVersion: string) {
       body: toServerSentEvents([
         { type: 'block_start', block: { type: 'text', text: '' } },
         { type: 'text_delta', text: chatReply },
+        { type: 'message_end', stopReason: 'end_turn' },
+      ]),
+    });
+  }
+  if (path === '/api/explain') {
+    return route.fulfill({
+      headers: { 'Content-Type': 'text/event-stream' },
+      body: toServerSentEvents([
+        { type: 'block_start', block: { type: 'text', text: '' } },
+        { type: 'text_delta', text: explanationReply },
         { type: 'message_end', stopReason: 'end_turn' },
       ]),
     });
@@ -326,6 +343,10 @@ async function main() {
 
     await selectTextByTouch({ page, cdp });
     await capture({ page, name: 'ReaderPageWithSelection-fb2' });
+
+    await page.getByRole('button', { name: 'Explain' }).click();
+    await page.locator('.explanation-text').waitFor();
+    await capture({ page, name: 'ReaderPageWithExplanation-fb2' });
     await page.keyboard.press('Escape');
 
     await page.getByRole('button', { name: 'Table of contents' }).click();
@@ -345,7 +366,7 @@ async function main() {
     await page.getByText('ru', { exact: true }).waitFor();
     await capture({ page, name: 'HomePageWithNasNavigation' });
 
-    for (const settingsPath of ['', 'nas', 'developer']) {
+    for (const settingsPath of ['', 'nas', 'explanation', 'developer']) {
       await page.goto(`${appUrl}/settings/${settingsPath}`);
       await page.locator('.page-title').waitFor();
       await capture({ page, name: `SettingsPage-${settingsPath || 'root'}` });

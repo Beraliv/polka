@@ -8,7 +8,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { chromium, type Page, type Route } from 'playwright';
+import { chromium, type CDPSession, type Page, type Route } from 'playwright';
 
 const repoRoot = join(import.meta.dirname, '..');
 const screenshotsDir = join(repoRoot, 'docs', 'screenshots');
@@ -180,6 +180,114 @@ async function openFootnoteOnCurrentOrLaterPage(page: Page) {
   throw new Error('No footnote found within 50 pages');
 }
 
+type Point = { x: number; y: number };
+
+// Where the `wordIndex`-th word (counting whitespace-separated runs) of a
+// reader paragraph's first text node sits on screen, plus the paragraph's line
+// height, so callers can aim a touch at it.
+async function findWordOnScreen({
+  page,
+  paragraphIndex,
+  wordIndex,
+}: {
+  page: Page;
+  paragraphIndex: number;
+  wordIndex: number;
+}): Promise<{ left: number; right: number; centerY: number; lineHeight: number }> {
+  return page
+    .locator('.reader-paragraph')
+    .nth(paragraphIndex)
+    .evaluate((paragraphEl, targetWordIndex) => {
+      const textNode = document.createTreeWalker(paragraphEl, NodeFilter.SHOW_TEXT).nextNode();
+      const word = [...(textNode?.textContent ?? '').matchAll(/\S+/g)][targetWordIndex];
+      if (!textNode || !word) {
+        throw new Error(`No word ${targetWordIndex} in this paragraph`);
+      }
+      const range = document.createRange();
+      range.setStart(textNode, word.index);
+      range.setEnd(textNode, word.index + word[0].length);
+      const rect = range.getBoundingClientRect();
+      return {
+        left: rect.left,
+        right: rect.right,
+        centerY: rect.top + rect.height / 2,
+        lineHeight: parseFloat(getComputedStyle(paragraphEl).lineHeight),
+      };
+    }, wordIndex);
+}
+
+// Playwright has no long-press or touch drag, so raw touches are sent through
+// the Chrome DevTools Protocol. Chromium turns them into touch and pointer
+// events exactly as it would for a finger, which is what the reader's
+// long-press and handle dragging listen to.
+async function sendTouch({ cdp, type, point }: { cdp: CDPSession; type: string; point?: Point }) {
+  await cdp.send('Input.dispatchTouchEvent', {
+    type,
+    touchPoints: point ? [{ x: point.x, y: point.y }] : [],
+  });
+}
+
+async function longPress({ page, cdp, point }: { page: Page; cdp: CDPSession; point: Point }) {
+  await sendTouch({ cdp, type: 'touchStart', point });
+  // Comfortably past the reader's LONG_PRESS_MS.
+  await page.waitForTimeout(700);
+  await sendTouch({ cdp, type: 'touchEnd' });
+}
+
+async function touchDrag({
+  page,
+  cdp,
+  from,
+  to,
+}: {
+  page: Page;
+  cdp: CDPSession;
+  from: Point;
+  to: Point;
+}) {
+  await sendTouch({ cdp, type: 'touchStart', point: from });
+  const steps = 10;
+  for (let step = 1; step <= steps; step += 1) {
+    const progress = step / steps;
+    await sendTouch({
+      cdp,
+      type: 'touchMove',
+      point: { x: from.x + (to.x - from.x) * progress, y: from.y + (to.y - from.y) * progress },
+    });
+    // The reader applies at most one drag position per animation frame.
+    await page.waitForTimeout(32);
+  }
+  await sendTouch({ cdp, type: 'touchEnd' });
+}
+
+// Long-presses a word, then drags the end handle a few lines down, so the
+// screenshot shows a multi-line selection with its handles and toolbar. In
+// Part 1, Chapter X this selects the sentence "Облонский снял пальто … с
+// салфетками." from the chapter's opening paragraph.
+async function selectTextByTouch({ page, cdp }: { page: Page; cdp: CDPSession }) {
+  const startWord = await findWordOnScreen({ page, paragraphIndex: 0, wordIndex: 27 });
+  await longPress({
+    page,
+    cdp,
+    point: { x: (startWord.left + startWord.right) / 2, y: startWord.centerY },
+  });
+  const handleBox = await page.locator('.selection-handle--end').boundingBox();
+  if (!handleBox) {
+    throw new Error('Long-press did not start a selection');
+  }
+  const endWord = await findWordOnScreen({ page, paragraphIndex: 0, wordIndex: 47 });
+  await touchDrag({
+    page,
+    cdp,
+    from: { x: handleBox.x + handleBox.width / 2, y: handleBox.y + handleBox.height / 2 },
+    // Just inside the word's right edge, so the whole word (and its full
+    // stop) is selected. The reader reads a dragged handle's position half a
+    // line above the finger, since the handle hangs below its line; aim that
+    // much lower.
+    to: { x: endWord.right - 1, y: endWord.centerY + endWord.lineHeight / 2 },
+  });
+}
+
 async function main() {
   const serverVersion = await readVersion('server');
   const devServer = await startDevServer();
@@ -199,6 +307,7 @@ async function main() {
       (route) => answerApiRequest(route, serverVersion),
     );
     const page = await context.newPage();
+    const cdp = await context.newCDPSession(page);
 
     await page.goto(appUrl);
     await page.locator('.empty-state').waitFor();
@@ -214,6 +323,10 @@ async function main() {
     // Part 1, Chapter X, which has footnotes translating French phrases.
     await jumpToChapter({ page, title: /^X\.$/ });
     await capture({ page, name: 'ReaderPage-fb2' });
+
+    await selectTextByTouch({ page, cdp });
+    await capture({ page, name: 'ReaderPageWithSelection-fb2' });
+    await page.keyboard.press('Escape');
 
     await page.getByRole('button', { name: 'Table of contents' }).click();
     await page.locator('.toc-entry.active').waitFor();

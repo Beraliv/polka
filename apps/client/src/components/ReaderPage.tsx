@@ -8,6 +8,7 @@ import {
   onMount,
   onCleanup,
   batch,
+  on,
 } from 'solid-js';
 import { Dynamic } from 'solid-js/web';
 import { useNavigate, useParams } from '@solidjs/router';
@@ -15,9 +16,12 @@ import { ChevronLeftIcon } from './ChevronLeftIcon.tsx';
 import { ChevronRightIcon } from './ChevronRightIcon.tsx';
 import { CloseIcon } from './CloseIcon.tsx';
 import { TocIcon } from './TocIcon.tsx';
+import { SelectionOverlay } from './SelectionOverlay.tsx';
+import { SelectionToolbar } from './SelectionToolbar.tsx';
 import { store, setStore, BookStore } from '../store/books.ts';
 import { saveProgress, resolveBestProgress, progressFraction } from '../lib/progress.ts';
 import { BookFilesDB } from '../lib/polka-db.ts';
+import { createSelectionManager } from '../lib/create-selection-manager.ts';
 import {
   parseBook,
   decodeImageAssets,
@@ -45,6 +49,9 @@ import type { Progress } from '@polka/shared';
 import { i18n } from '../i18n';
 import { debounce } from '../lib/debounce.ts';
 import { formatDuration } from '../lib/formatDuration.ts';
+
+// How long a touch must hold still on a word before it starts a selection.
+const LONG_PRESS_MS = 450;
 
 // Internal token for pagination: words (optionally styled) or atomic note references.
 type Token = { text: string; style?: TextStyle } | NoteRef;
@@ -512,6 +519,17 @@ export function ReaderPage() {
   let pageEl: HTMLDivElement | undefined;
   let touchStartX = 0;
   let touchStartY = 0;
+  let longPressTimer: ReturnType<typeof setTimeout> | undefined;
+  let longPressFired = false;
+
+  const selectionManager = createSelectionManager();
+  // A selection points at a rendered paragraph element, which is gone once
+  // the page changes or the book is re-paginated. Watching the page state
+  // itself, rather than dismissing in each navigation function, covers every
+  // way of getting there (page turns, keys, TOC jumps, resize).
+  createEffect(
+    on([pageIdx, localPages], () => selectionManager.dismissSelection(), { defer: true }),
+  );
 
   const pageStep = () => (isTwoPageView() ? 2 : 1);
 
@@ -710,13 +728,23 @@ export function ReaderPage() {
 
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
-        if (activeNoteId() || fullscreenImageId() || tocOpen()) {
+        if (
+          activeNoteId() ||
+          fullscreenImageId() ||
+          tocOpen() ||
+          selectionManager.activeSelection()
+        ) {
           return;
         }
         event.preventDefault();
         nextPage();
       } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
-        if (activeNoteId() || fullscreenImageId() || tocOpen()) {
+        if (
+          activeNoteId() ||
+          fullscreenImageId() ||
+          tocOpen() ||
+          selectionManager.activeSelection()
+        ) {
           return;
         }
         event.preventDefault();
@@ -728,6 +756,8 @@ export function ReaderPage() {
           setActiveNoteId(null);
         } else if (tocOpen()) {
           setTocOpen(false);
+        } else if (selectionManager.activeSelection()) {
+          selectionManager.dismissSelection();
         } else {
           navigate('/');
         }
@@ -793,9 +823,40 @@ export function ReaderPage() {
       touchStartX = touch.clientX;
       touchStartY = touch.clientY;
     }
+    longPressFired = false;
+    clearTimeout(longPressTimer);
+    if (!touch || selectionManager.activeSelection()) {
+      return;
+    }
+    const clientX = touch.clientX;
+    const clientY = touch.clientY;
+    longPressTimer = setTimeout(() => {
+      longPressFired = true;
+      selectionManager.selectWordAtPoint(clientX, clientY);
+    }, LONG_PRESS_MS);
+  }
+
+  function handleContentTouchMove(event: TouchEvent) {
+    const touch = event.touches[0];
+    if (!touch) {
+      return;
+    }
+    if (
+      Math.abs(touch.clientX - touchStartX) > TAP_MOVE_TOLERANCE_PX ||
+      Math.abs(touch.clientY - touchStartY) > TAP_MOVE_TOLERANCE_PX
+    ) {
+      clearTimeout(longPressTimer);
+    }
   }
 
   function handleContentTouchEnd(event: TouchEvent) {
+    clearTimeout(longPressTimer);
+    if (longPressFired) {
+      // Selection just started via long-press — this touchend is its
+      // release, not a separate tap, so it must not also page-turn.
+      longPressFired = false;
+      return;
+    }
     if (activeNoteId()) {
       return;
     }
@@ -804,6 +865,11 @@ export function ReaderPage() {
       return;
     }
     if (Math.abs(touch.clientX - touchStartX) > 10 || Math.abs(touch.clientY - touchStartY) > 10) {
+      return;
+    }
+    if (selectionManager.activeSelection()) {
+      // A tap elsewhere while a selection/toolbar is open just dismisses it.
+      selectionManager.dismissSelection();
       return;
     }
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -859,7 +925,10 @@ export function ReaderPage() {
         class="reader-content"
         ref={contentEl}
         onTouchStart={handleContentTouchStart}
+        onTouchMove={handleContentTouchMove}
         onTouchEnd={handleContentTouchEnd}
+        onPointerDown={selectionManager.selectByPointerDrag}
+        onDblClick={selectionManager.selectWordOnDoubleClick}
       >
         <button
           class="reader-nav-overlay reader-nav-overlay--prev"
@@ -908,6 +977,30 @@ export function ReaderPage() {
             </div>
           </Show>
         </div>
+
+        {/* Not keyed: the Range changes on every handle drag step, and a keyed
+            Show would tear down the overlay — including the handle holding
+            pointer capture — each time, stalling the drag. */}
+        <Show when={selectionManager.activeRange()}>
+          {(range) => {
+            const containerRect = contentEl!.getBoundingClientRect();
+            return (
+              <>
+                <SelectionOverlay
+                  range={range()}
+                  containerRect={containerRect}
+                  onDragStart={selectionManager.dragHandle}
+                />
+                <SelectionToolbar
+                  rect={range().getBoundingClientRect()}
+                  containerRect={containerRect}
+                  onCopy={() => void selectionManager.copyActiveSelection()}
+                  onSearchInWeb={selectionManager.searchActiveSelectionInWeb}
+                />
+              </>
+            );
+          }}
+        </Show>
       </div>
 
       <Show when={tocOpen()}>

@@ -8,6 +8,7 @@ import {
   onMount,
   onCleanup,
   batch,
+  on,
 } from 'solid-js';
 import { Dynamic } from 'solid-js/web';
 import { useNavigate, useParams } from '@solidjs/router';
@@ -522,6 +523,13 @@ export function ReaderPage() {
   let longPressFired = false;
 
   const selectionManager = createSelectionManager();
+  // A selection points at a rendered paragraph element, which is gone once
+  // the page changes or the book is re-paginated. Watching the page state
+  // itself, rather than dismissing in each navigation function, covers every
+  // way of getting there (page turns, keys, TOC jumps, resize).
+  createEffect(
+    on([pageIdx, localPages], () => selectionManager.dismissSelection(), { defer: true }),
+  );
 
   const pageStep = () => (isTwoPageView() ? 2 : 1);
 
@@ -611,7 +619,6 @@ export function ReaderPage() {
     const built = buildPages({ pageEl, sections, imageAssets: imageAssets() });
     BookStore.updateTotalPages(bookId, built.pages.length);
     batch(() => {
-      selectionManager.dismissSelection();
       setLocalPages(built.pages);
       setSectionStartPageIndexes(built.sectionStartPageIndexes);
       const restoredIndex = Math.round(restoreFraction * Math.max(0, built.pages.length - 1));
@@ -634,13 +641,11 @@ export function ReaderPage() {
   }
 
   function nextPage() {
-    selectionManager.dismissSelection();
     setPageIdx((current) => clampPageIndex(current + pageStep(), localPages().length));
     scrollToTop();
   }
 
   function prevPage() {
-    selectionManager.dismissSelection();
     setPageIdx((current) => clampPageIndex(current - pageStep(), localPages().length));
     scrollToTop();
   }
@@ -923,7 +928,7 @@ export function ReaderPage() {
         onTouchMove={handleContentTouchMove}
         onTouchEnd={handleContentTouchEnd}
         onPointerDown={selectionManager.selectByPointerDrag}
-        onDblClick={(event) => selectionManager.selectWordAtPoint(event.clientX, event.clientY)}
+        onDblClick={selectionManager.selectWordOnDoubleClick}
       >
         <button
           class="reader-nav-overlay reader-nav-overlay--prev"

@@ -18,14 +18,12 @@ function buildParagraphEl(text: string): HTMLElement {
 function stubPointAt({ paragraphEl, offset }: { paragraphEl: HTMLElement; offset: number }) {
   const caretRange = document.createRange();
   caretRange.setStart(paragraphEl.firstChild!, offset);
-  document.elementFromPoint = () => paragraphEl;
   (document as CaretDocument).caretRangeFromPoint = () => caretRange;
 }
 
 // Hit-testing is stubbed so a point's X coordinate is its character offset
 // into paragraphEl's single text node.
 function stubOffsetsFromX(paragraphEl: HTMLElement) {
-  document.elementFromPoint = () => paragraphEl;
   (document as CaretDocument).caretRangeFromPoint = (x) => {
     const caretRange = document.createRange();
     caretRange.setStart(paragraphEl.firstChild!, x);
@@ -33,12 +31,24 @@ function stubOffsetsFromX(paragraphEl: HTMLElement) {
   };
 }
 
-type PointerInit = { type: string; clientX: number; pointerType?: string; button?: number };
+type PointerInit = {
+  type: string;
+  clientX: number;
+  clientY?: number;
+  pointerType?: string;
+  button?: number;
+};
 
 // jsdom doesn't implement PointerEvent, so a MouseEvent gets the pointer
 // fields the manager reads.
-function createPointerEvent({ type, clientX, pointerType = 'mouse', button = 0 }: PointerInit) {
-  const event = new MouseEvent(type, { clientX, clientY: 0, button });
+function createPointerEvent({
+  type,
+  clientX,
+  clientY = 0,
+  pointerType = 'mouse',
+  button = 0,
+}: PointerInit) {
+  const event = new MouseEvent(type, { clientX, clientY, button });
   Object.defineProperties(event, {
     pointerId: { value: 1 },
     pointerType: { value: pointerType },
@@ -46,9 +56,28 @@ function createPointerEvent({ type, clientX, pointerType = 'mouse', button = 0 }
   return event as PointerEvent;
 }
 
+// Several paragraphs: a point's Y picks the paragraph (by index) and its X
+// is the character offset into that paragraph.
+function stubPositionsFromPoint(paragraphEls: HTMLElement[]) {
+  (document as CaretDocument).caretRangeFromPoint = (x, y) => {
+    const caretRange = document.createRange();
+    caretRange.setStart(paragraphEls[y]!.firstChild!, x);
+    return caretRange;
+  };
+}
+
+function createHandleDragEvent(clientX: number): PointerEvent {
+  const handleEl = document.createElement('div');
+  handleEl.setPointerCapture = () => {};
+  const event = createPointerEvent({ type: 'pointerdown', clientX });
+  Object.defineProperty(event, 'currentTarget', { value: handleEl });
+  return event;
+}
+
 afterEach(() => {
   document.body.innerHTML = '';
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe('SelectionManager', () => {
@@ -176,5 +205,127 @@ describe('SelectionManager.selectByPointerDrag', () => {
     window.dispatchEvent(createPointerEvent({ type: 'pointerup', clientX: 15 }));
 
     expect(manager.selection).toBeNull();
+  });
+});
+
+describe('SelectionManager.selectWordOnDoubleClick', () => {
+  it('selects the word after a mouse press', () => {
+    const paragraphEl = buildParagraphEl('The quick brown fox');
+    stubOffsetsFromX(paragraphEl);
+    const manager = new SelectionManager();
+
+    manager.selectByPointerDrag(createPointerEvent({ type: 'pointerdown', clientX: 6 }));
+    window.dispatchEvent(createPointerEvent({ type: 'pointerup', clientX: 6 }));
+    manager.selectWordOnDoubleClick(new MouseEvent('dblclick', { clientX: 6 }));
+
+    expect(manager.range?.toString()).toBe('quick');
+  });
+
+  it('ignores a double-tap on a touch screen', () => {
+    const paragraphEl = buildParagraphEl('The quick brown fox');
+    stubOffsetsFromX(paragraphEl);
+    const manager = new SelectionManager();
+
+    manager.selectByPointerDrag(
+      createPointerEvent({ type: 'pointerdown', clientX: 6, pointerType: 'touch' }),
+    );
+    manager.selectWordOnDoubleClick(new MouseEvent('dblclick', { clientX: 6 }));
+
+    expect(manager.selection).toBeNull();
+  });
+});
+
+describe('SelectionManager pointer tracking', () => {
+  it('drops the pending move when the gesture is cancelled', () => {
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] });
+    const paragraphEl = buildParagraphEl('The quick brown fox');
+    stubOffsetsFromX(paragraphEl);
+    const manager = new SelectionManager();
+
+    manager.selectByPointerDrag(createPointerEvent({ type: 'pointerdown', clientX: 4 }));
+    window.dispatchEvent(createPointerEvent({ type: 'pointermove', clientX: 9 }));
+    window.dispatchEvent(createPointerEvent({ type: 'pointercancel', clientX: 9 }));
+    vi.advanceTimersToNextFrame();
+
+    expect(manager.selection).toBeNull();
+  });
+});
+
+describe('SelectionManager across paragraphs', () => {
+  it('extends a mouse drag into the following paragraphs', () => {
+    const paragraphEls = [
+      buildParagraphEl('First paragraph.'),
+      buildParagraphEl('Second one.'),
+      buildParagraphEl('Third.'),
+    ];
+    stubPositionsFromPoint(paragraphEls);
+    const manager = new SelectionManager();
+
+    manager.selectByPointerDrag(
+      createPointerEvent({ type: 'pointerdown', clientX: 6, clientY: 0 }),
+    );
+    window.dispatchEvent(createPointerEvent({ type: 'pointermove', clientX: 5, clientY: 2 }));
+    window.dispatchEvent(createPointerEvent({ type: 'pointerup', clientX: 5, clientY: 2 }));
+
+    expect(manager.range?.toString()).toBe('paragraph.Second one.Third');
+  });
+
+  it('extends a mouse drag backwards into a previous paragraph', () => {
+    const paragraphEls = [buildParagraphEl('First paragraph.'), buildParagraphEl('Second one.')];
+    stubPositionsFromPoint(paragraphEls);
+    const manager = new SelectionManager();
+
+    manager.selectByPointerDrag(
+      createPointerEvent({ type: 'pointerdown', clientX: 6, clientY: 1 }),
+    );
+    window.dispatchEvent(createPointerEvent({ type: 'pointermove', clientX: 6, clientY: 0 }));
+    window.dispatchEvent(createPointerEvent({ type: 'pointerup', clientX: 6, clientY: 0 }));
+
+    expect(manager.selection?.start).toEqual({ paragraphEl: paragraphEls[0], offset: 6 });
+    expect(manager.selection?.end).toEqual({ paragraphEl: paragraphEls[1], offset: 6 });
+  });
+
+  it('drags the end handle into the next paragraph', () => {
+    const paragraphEls = [buildParagraphEl('First paragraph.'), buildParagraphEl('Second one.')];
+    stubPositionsFromPoint(paragraphEls);
+    const manager = new SelectionManager();
+    manager.selectWordAtPoint(1, 0);
+
+    manager.dragHandle('end', createHandleDragEvent(5));
+    window.dispatchEvent(createPointerEvent({ type: 'pointermove', clientX: 6, clientY: 1 }));
+    window.dispatchEvent(createPointerEvent({ type: 'pointerup', clientX: 6, clientY: 1 }));
+
+    expect(manager.range?.toString()).toBe('First paragraph.Second');
+  });
+
+  it('keeps the start handle from passing the end', () => {
+    const paragraphEls = [buildParagraphEl('First paragraph.'), buildParagraphEl('Second one.')];
+    stubPositionsFromPoint(paragraphEls);
+    const manager = new SelectionManager();
+    manager.selectWordAtPoint(1, 0);
+    const selectionBefore = manager.selection;
+
+    manager.dragHandle('start', createHandleDragEvent(0));
+    window.dispatchEvent(createPointerEvent({ type: 'pointermove', clientX: 3, clientY: 1 }));
+    window.dispatchEvent(createPointerEvent({ type: 'pointerup', clientX: 3, clientY: 1 }));
+
+    expect(manager.selection).toBe(selectionBefore);
+  });
+
+  it('copies paragraphs separated by newlines', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+    const paragraphEls = [buildParagraphEl('First paragraph.'), buildParagraphEl('Second one.')];
+    stubPositionsFromPoint(paragraphEls);
+    const manager = new SelectionManager();
+    manager.selectByPointerDrag(
+      createPointerEvent({ type: 'pointerdown', clientX: 6, clientY: 0 }),
+    );
+    window.dispatchEvent(createPointerEvent({ type: 'pointermove', clientX: 6, clientY: 1 }));
+    window.dispatchEvent(createPointerEvent({ type: 'pointerup', clientX: 6, clientY: 1 }));
+
+    await manager.copyActiveSelection();
+
+    expect(writeText).toHaveBeenCalledWith('paragraph.\nSecond');
   });
 });

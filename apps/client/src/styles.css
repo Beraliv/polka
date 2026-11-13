@@ -537,7 +537,7 @@ h5.reader-section-title {
 
 /* ---- Text selection ---- */
 
-/* Painted as plain positioned divs (from Range.getClientRects()) rather than
+/* Painted as plain positioned divs (one per line box of selected text) rather than
    via the CSS Custom Highlight API — WebKit's ::highlight() implementation
    doesn't reliably paint on iOS, even given a StaticRange. pointer-events:
    none keeps them from intercepting taps meant for the text underneath. */

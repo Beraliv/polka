@@ -1,4 +1,5 @@
 import { Index, Show, createMemo } from 'solid-js';
+import { textRectsInRange } from '../lib/text-offsets.ts';
 
 type SelectionOverlayProps = {
   range: Range;
@@ -14,7 +15,7 @@ function stopTouchPropagation(event: TouchEvent) {
 }
 
 export function SelectionOverlay(props: SelectionOverlayProps) {
-  const rects = createMemo(() => Array.from(props.range.getClientRects()));
+  const rects = createMemo(() => textRectsInRange(props.range));
   const startRect = () => rects()[0];
   const endRect = () => rects().at(-1);
 

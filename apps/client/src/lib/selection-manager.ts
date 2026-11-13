@@ -1,18 +1,19 @@
 import { copyText } from './copy-text.ts';
-import { offsetFromPoint, rangeFromOffsets, wordBoundsAtOffset } from './text-offsets.ts';
+import {
+  comparePositions,
+  positionFromPoint,
+  rangeBetween,
+  textBetween,
+  wordBoundsAtOffset,
+} from './text-offsets.ts';
+import type { TextPosition } from './text-offsets.ts';
 
 const WEB_SEARCH_URL = 'https://www.google.com/search?q=';
 
-// A selection in progress, stored as combined-text offsets into one rendered
-// paragraph rather than a live Range — Ranges go stale the moment the page
-// they belong to unmounts, but offsets can be re-resolved against
-// paragraphEl on demand. Confined to a single paragraph: dragging a handle
-// clamps to its bounds.
-export type ActiveSelection = {
-  paragraphEl: HTMLElement;
-  startOffset: number;
-  endOffset: number;
-};
+// The selected text from `start` to `end` (exclusive), in reading order. The
+// two positions may be in different paragraphs anywhere on the visible
+// page(s), and `start` always comes before `end`.
+export type ActiveSelection = { start: TextPosition; end: TextPosition };
 
 export type SelectionListener = (selection: ActiveSelection | null) => void;
 
@@ -21,9 +22,8 @@ type TrackPointerOptions = {
   onPoint: (clientX: number, clientY: number) => void;
 };
 
-function paragraphAtPoint(clientX: number, clientY: number): HTMLElement | null {
-  const target = document.elementFromPoint(clientX, clientY);
-  return target instanceof HTMLElement ? target.closest<HTMLElement>('.reader-paragraph') : null;
+function isSamePosition(first: TextPosition, second: TextPosition): boolean {
+  return first.paragraphEl === second.paragraphEl && first.offset === second.offset;
 }
 
 /**
@@ -37,9 +37,12 @@ function paragraphAtPoint(clientX: number, clientY: number): HTMLElement | null 
 export class SelectionManager {
   #currentSelection: ActiveSelection | null = null;
   // Cached per selection change so the overlay, handles and toolbar all
-  // share one Range instead of each re-walking the paragraph's text nodes.
+  // share one Range instead of each re-walking the paragraphs' text nodes.
   #currentRange: Range | null = null;
   readonly #listeners = new Set<SelectionListener>();
+  // `dblclick` is a MouseEvent without a pointerType, so whether a double
+  // click came from a mouse is read off the press that preceded it.
+  #lastPressWasMouse = false;
 
   get selection(): ActiveSelection | null {
     return this.#currentSelection;
@@ -61,61 +64,78 @@ export class SelectionManager {
     this.#setSelection(null);
   }
 
-  /** Selects the word at a viewport point; used by long-press and double-click. */
+  /** Selects the word at a viewport point; used by long-press and mouse double-click. */
   selectWordAtPoint(clientX: number, clientY: number): void {
-    const paragraphEl = paragraphAtPoint(clientX, clientY);
-    if (!paragraphEl) {
+    const position = positionFromPoint(clientX, clientY);
+    if (!position) {
       return;
     }
-    const offset = offsetFromPoint(paragraphEl, clientX, clientY);
-    if (offset === null) {
-      return;
-    }
-    const [start, end] = wordBoundsAtOffset(paragraphEl.textContent ?? '', offset);
+    const { paragraphEl } = position;
+    const [start, end] = wordBoundsAtOffset(paragraphEl.textContent ?? '', position.offset);
     if (start === end) {
       // Pressed on whitespace or punctuation, not a word — nothing to select.
       return;
     }
-    this.#setSelection({ paragraphEl, startOffset: start, endOffset: end });
+    this.#setSelection({
+      start: { paragraphEl, offset: start },
+      end: { paragraphEl, offset: end },
+    });
   }
 
   /**
-   * Mouse selection: pressing on a paragraph and dragging selects from the
-   * press point to the pointer, character by character, like native
-   * selection. Any press also dismisses the open selection, the mouse
+   * Mouse double-click selects the word under the pointer. Ignored for touch:
+   * mobile browsers can fire `dblclick` on a double-tap, and touch selection
+   * starts from a long-press instead.
+   */
+  selectWordOnDoubleClick(event: MouseEvent): void {
+    if (!this.#lastPressWasMouse) {
+      return;
+    }
+    this.selectWordAtPoint(event.clientX, event.clientY);
+  }
+
+  /**
+   * Mouse selection: pressing on text and dragging selects from the press
+   * point to the pointer, character by character and across paragraphs, like
+   * native selection. Any press also dismisses the open selection, the mouse
    * counterpart of tapping elsewhere. Touch and pen are ignored — on touch
    * screens a press-and-drag is a swipe, so selection starts from a
    * long-press there instead.
    */
   selectByPointerDrag(event: PointerEvent): void {
+    this.#lastPressWasMouse = event.pointerType === 'mouse';
     if (event.pointerType !== 'mouse' || event.button !== 0) {
       return;
     }
     this.#setSelection(null);
-    const paragraphEl = paragraphAtPoint(event.clientX, event.clientY);
-    if (!paragraphEl) {
-      return;
-    }
-    const anchorOffset = offsetFromPoint(paragraphEl, event.clientX, event.clientY);
-    if (anchorOffset === null) {
+    const anchor = positionFromPoint(event.clientX, event.clientY);
+    if (!anchor) {
       return;
     }
     this.#trackPointer({
       pointerId: event.pointerId,
       onPoint: (clientX, clientY) => {
-        const offset = offsetFromPoint(paragraphEl, clientX, clientY);
-        // Back on the anchor, the last non-empty selection is kept rather
-        // than collapsing to nothing mid-drag.
-        if (offset === null || offset === anchorOffset) {
+        const focus = positionFromPoint(clientX, clientY);
+        // Off the text (margins, between paragraphs) the selection keeps its
+        // last extent; back on the anchor it keeps the last non-empty one
+        // rather than collapsing to nothing mid-drag.
+        if (!focus) {
           return;
         }
-        const startOffset = Math.min(anchorOffset, offset);
-        const endOffset = Math.max(anchorOffset, offset);
+        const order = comparePositions(anchor, focus);
+        if (order === 0) {
+          return;
+        }
+        const next = order < 0 ? { start: anchor, end: focus } : { start: focus, end: anchor };
         const previous = this.#currentSelection;
-        if (previous?.startOffset === startOffset && previous.endOffset === endOffset) {
+        if (
+          previous &&
+          isSamePosition(previous.start, next.start) &&
+          isSamePosition(previous.end, next.end)
+        ) {
           return;
         }
-        this.#setSelection({ paragraphEl, startOffset, endOffset });
+        this.#setSelection(next);
       },
     });
   }
@@ -127,7 +147,6 @@ export class SelectionManager {
     if (!selectionAtStart) {
       return;
     }
-    const { paragraphEl } = selectionAtStart;
     const pointerId = event.pointerId;
     (event.currentTarget as HTMLElement).setPointerCapture(pointerId);
 
@@ -136,27 +155,33 @@ export class SelectionManager {
     // any natural drag motion tips the raw Y into that next line's hit-test
     // zone. Sampling from mid-line instead keeps horizontal drags resolving
     // within the line the handle actually represents.
-    const lineHeightPx = parseFloat(getComputedStyle(paragraphEl).lineHeight);
+    const lineHeightPx = parseFloat(
+      getComputedStyle(selectionAtStart[edge].paragraphEl).lineHeight,
+    );
     const sampleYOffset = Number.isNaN(lineHeightPx) ? 0 : lineHeightPx / 2;
 
     this.#trackPointer({
       pointerId,
       onPoint: (clientX, clientY) => {
-        const offset = offsetFromPoint(paragraphEl, clientX, clientY - sampleYOffset);
+        const position = positionFromPoint(clientX, clientY - sampleYOffset);
         const previous = this.#currentSelection;
-        if (offset === null || !previous) {
+        if (!position || !previous) {
           return;
         }
-        const nextStart =
-          edge === 'start' ? Math.min(offset, previous.endOffset - 1) : previous.startOffset;
-        const nextEnd =
-          edge === 'end' ? Math.max(offset, previous.startOffset + 1) : previous.endOffset;
-        // Skipping unchanged offsets keeps subscribers from being notified, so a
-        // pointer jittering within one character re-renders nothing.
-        if (nextStart === previous.startOffset && nextEnd === previous.endOffset) {
+        // Skipping an unchanged position keeps subscribers from being
+        // notified, so a pointer jittering within one character re-renders
+        // nothing.
+        if (isSamePosition(position, previous[edge])) {
           return;
         }
-        this.#setSelection({ ...previous, startOffset: nextStart, endOffset: nextEnd });
+        // An end can't be dragged onto or past the other; the selection
+        // stays at its last valid extent until the pointer comes back.
+        const isBeforeEnd = comparePositions(position, previous.end) < 0;
+        const isAfterStart = comparePositions(position, previous.start) > 0;
+        if (edge === 'start' ? !isBeforeEnd : !isAfterStart) {
+          return;
+        }
+        this.#setSelection({ ...previous, [edge]: position });
       },
     });
   }
@@ -218,7 +243,11 @@ export class SelectionManager {
       }
       if (frameId !== undefined) {
         cancelAnimationFrame(frameId);
-        applyPendingPoint();
+        // A cancelled gesture (the browser took it over) shouldn't move the
+        // selection; only a real release applies the last position.
+        if (endEvent.type === 'pointerup') {
+          applyPendingPoint();
+        }
       }
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleEnd);
@@ -227,14 +256,15 @@ export class SelectionManager {
 
     // Listening on window rather than the pressed element keeps the drag
     // alive even if that element is re-created mid-gesture (as a selection
-    // handle can be), and lets a mouse drag continue past the paragraph.
+    // handle can be), and lets a mouse drag continue over other paragraphs.
     window.addEventListener('pointermove', handleMove);
     window.addEventListener('pointerup', handleEnd);
     window.addEventListener('pointercancel', handleEnd);
   }
 
   #selectionText(): string {
-    return this.#currentRange?.toString() ?? '';
+    const current = this.#currentSelection;
+    return current ? textBetween(current.start, current.end) : '';
   }
 
   #setSelection(next: ActiveSelection | null): void {
@@ -242,9 +272,7 @@ export class SelectionManager {
       return;
     }
     this.#currentSelection = next;
-    this.#currentRange = next
-      ? rangeFromOffsets(next.paragraphEl, next.startOffset, next.endOffset)
-      : null;
+    this.#currentRange = next ? rangeBetween(next.start, next.end) : null;
     for (const listener of this.#listeners) {
       listener(next);
     }

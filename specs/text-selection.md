@@ -1,146 +1,127 @@
 # Text selection
 
-The reader's custom text selection: long-press a word (touch) or drag across text or double-click a word (mouse), adjust it with the handles, then copy it or search the web for it.
+The reader's custom text selection: start a selection with a long-press (touch) or by dragging or double-clicking (mouse), adjust it with two handles across any paragraphs on screen, then copy it or search the web for it.
 
-The browser's native selection is turned off on reader paragraphs (`user-select: none`, `-webkit-touch-callout: none`) and the selection is drawn by the app instead. Native selection fights the reader's own touch gestures (tap to turn pages, swipe), and its iOS callout can't be styled or extended.
+## Why a custom selection
 
-## Files
+Native text selection is turned off on reader paragraphs (`user-select: none`, `-webkit-touch-callout: none`) and the app draws its own:
 
-| File | Role |
+- **Native selection fights the reader's gestures.** Taps at the page edges turn pages; a native long-press and drag would compete with them.
+- **The iOS callout can't be styled or extended,** so actions like Search in Web couldn't be added to it.
+
+## Where it lives
+
+| File (under `apps/client/src`) | Role |
 |---|---|
-| [`lib/selection-manager.ts`](../apps/client/src/lib/selection-manager.ts) | `SelectionManager`, the framework-free class that holds all selection logic |
-| [`lib/create-selection-manager.ts`](../apps/client/src/lib/create-selection-manager.ts) | `createSelectionManager()`, the Solid adapter over it |
-| [`lib/text-offsets.ts`](../apps/client/src/lib/text-offsets.ts) | Pure helpers that map between viewport points, text offsets and `Range`s |
-| [`lib/copy-text.ts`](../apps/client/src/lib/copy-text.ts) | `copyText()`, clipboard write with a fallback for insecure contexts |
-| [`components/SelectionOverlay.tsx`](../apps/client/src/components/SelectionOverlay.tsx) | Selection boxes and the two drag handles |
+| [`lib/selection-manager.ts`](../apps/client/src/lib/selection-manager.ts) | `SelectionManager`: all selection logic, framework-free |
+| [`lib/create-selection-manager.ts`](../apps/client/src/lib/create-selection-manager.ts) | Solid adapter over it |
+| [`lib/text-offsets.ts`](../apps/client/src/lib/text-offsets.ts) | Positions in the text: hit-testing, ordering, `Range`s, selected text and its boxes |
+| [`lib/copy-text.ts`](../apps/client/src/lib/copy-text.ts) | Clipboard write, with a fallback for plain HTTP |
+| [`components/SelectionOverlay.tsx`](../apps/client/src/components/SelectionOverlay.tsx) | Selection boxes and handles |
 | [`components/SelectionToolbar.tsx`](../apps/client/src/components/SelectionToolbar.tsx) | Copy and Search in Web buttons |
 | [`components/ReaderPage.tsx`](../apps/client/src/components/ReaderPage.tsx) | Gesture wiring and dismissal |
 
-All paths are relative to `apps/client/src`. The class/adapter split follows [JavaScript / TypeScript](javascript-typescript.md).
+The split between the class and its adapter follows [JavaScript / TypeScript](javascript-typescript.md).
 
 ## Behaviour
 
-### Starting a selection
+### Starting a selection with touch
 
-- A touch held for `LONG_PRESS_MS` (450 ms) on `.reader-content` starts a selection at the touch point.
-- Moving more than `TAP_MOVE_TOLERANCE_PX` (10 px) on either axis before then cancels the long-press, so swipes and scrolls never select.
-- The word under the point is selected, using `Intl.Segmenter` word boundaries so it works for any language the browser supports. A press on whitespace or punctuation selects nothing.
-- No long-press timer starts while a selection is already open.
-- The `touchend` that ends a long-press is swallowed, so releasing the finger doesn't also count as a tap that turns the page.
+- Holding a finger still on a word for `LONG_PRESS_MS` selects that word. Moving further than `TAP_MOVE_TOLERANCE_PX` first cancels it, so swipes and scrolls never select.
+- Word boundaries come from `Intl.Segmenter`, so selection works in any language the browser can segment. A long-press on whitespace or punctuation selects nothing.
+- Lifting the finger after a long-press doesn't count as a tap, so it never turns the page.
+- No new long-press starts while a selection is open; a tap dismisses it first.
 
 ### Starting a selection with a mouse
 
-Desktop has no long-press, so the mouse uses the gestures of native selection. On devices with a mouse, paragraphs show the text cursor (`cursor: text` under `(hover: hover) and (pointer: fine)`).
+A mouse has no long-press, so it uses the gestures people know from native selection. On devices with a mouse, paragraphs show the text cursor.
 
-- **Press and drag** (`pointerdown` on `.reader-content`) selects from the press point to the pointer, character by character, in either direction. Moving back onto the press point keeps the last non-empty selection rather than clearing it. A press without movement selects nothing.
-- **Double-click** selects the word under the pointer, the same as a long-press.
-- Only `pointerType === 'mouse'` with the primary button starts a drag selection. Touch and pen are ignored, because on touch screens a press-and-drag is a swipe and selection starts from a long-press instead.
+- **Press and drag** selects from the press point to the pointer, character by character, in either direction and across paragraphs. A press without movement selects nothing.
+- **Double-click** selects the word under the pointer.
+- Only a mouse starts these. Touch screens can report the same events (a drag is a swipe there, and mobile browsers can turn a double-tap into a `dblclick`), and touch already has its own gesture.
 
-### Adjusting it
+### Adjusting a selection
 
-- Each end of the selection has a handle at the bottom of its line. Dragging a handle moves that end to the character under the pointer.
-- The selection always keeps at least one character: the start can't pass `end - 1`, nor the end `start + 1`.
-- The hit-test point is shifted up by half the paragraph's line height. A finger on a handle sits right on the boundary with the next line, so without the shift any natural drag would jump down a line.
-- A selection is confined to the paragraph it started in. Points outside that paragraph are ignored rather than extending the selection.
+- Each end has a handle at the bottom of its line. Dragging a handle moves that end to the character under the pointer, with a mouse or a finger.
+- A selection always keeps at least one character; one end can't be dragged onto or past the other.
+- A handle sits at the bottom of its line, so a finger on it is right at the boundary with the next line. The point is read half a line higher, so a sideways drag stays on the handle's own line instead of jumping down.
+- Either end can move into other paragraphs, anywhere on the visible page, or both pages of a two-page spread. Over a gap with no text (margins, the space between paragraphs), that end stays where it last was.
 
 ### Actions
 
-The toolbar sits centred above the selection, kept within the reading area's left and right edges.
+The toolbar sits centred above the selection, kept within the reading area horizontally. It may extend up over the reader header when the selection is on the first line.
 
-- **Copy** writes the selected text to the clipboard, then closes the selection.
-- **Search in Web** opens `https://www.google.com/search?q=<text>` in a new tab with `noopener`, then closes the selection. Leading and trailing whitespace is trimmed, and nothing opens if the trimmed text is empty.
+- **Copy** puts the selected text on the clipboard and closes the selection. Paragraphs are separated by a line break. The exception is a paragraph that pagination split across a page break: its two parts are joined with a space, as the one paragraph they are in the book.
+- **Search in Web** opens a Google search for the selected text in a new tab and closes the selection. Leading and trailing whitespace is trimmed, and nothing opens if no text is left.
+
+The search engine is a fixed default with no setting yet. Searching sends the selected text to Google; nothing is sent until the user presses the button.
 
 ### Dismissal
 
-The selection closes when:
+A selection lives only as long as the page it was made on. It closes when:
 
-- the user taps anywhere in `.reader-content` outside the toolbar and handles (the tap only dismisses; it does not also turn the page),
-- the mouse is pressed anywhere in `.reader-content` outside the toolbar and handles, which also starts a new drag selection,
-- the page turns, by tap, swipe, keyboard or navigation buttons,
-- the book is re-paginated, for example on resize, because the paragraph elements it points at are replaced,
-- Escape is pressed (it closes the selection before it would close the reader).
+- **the visible page changes** in any way: turning the page, the arrow keys, the TOC, or the book being re-paginated (for example on resize or rotation);
+- **the user taps or clicks elsewhere** in the reading area. A tap only dismisses and doesn't also turn the page; a mouse press also starts a new drag selection. The prev/next arrow buttons are the exception: they dismiss and turn the page;
+- **Escape** is pressed, after any open image, footnote or TOC, but before it would leave the reader;
+- **an action runs** (Copy, Search in Web).
 
-While a selection is open, the page-turn keys (arrows, Page Up/Down, Space) do nothing.
+While a selection is open, the page-turn keys do nothing, so a stray key press can't close it by turning the page.
 
-## `SelectionManager`
+## Design
 
-### State
+### Selection state: two text positions
 
-```ts
-type ActiveSelection = {
-  paragraphEl: HTMLElement;
-  startOffset: number;
-  endOffset: number;
-};
-```
+A selection is a start and an end position, in reading order. A position is a rendered paragraph element plus an offset into that paragraph's text (all its text nodes joined in order); the two can be in different paragraphs. From them, the manager builds one `Range` per change, which the boxes, handles and toolbar use.
 
-The selection is stored as offsets into the paragraph's combined text (all its text nodes joined in document order), not as a live `Range`. A `Range` points at specific text nodes and breaks when those nodes are re-rendered; offsets can always be resolved again against `paragraphEl`.
+- **Why paragraph and offset, not a DOM node:** a paragraph's text is split across several text nodes by styling (bold, italic, footnote markers). An offset into the whole paragraph is unaffected by that, and an unchanged drag step can be detected by comparing an element and a number, then skipped without re-rendering anything.
+- **Order comes from the document.** Positions in one paragraph compare by offset; positions in different paragraphs compare by the paragraphs' order in the page, which is reading order, including across the two pages of a spread.
+- **Why it can't outlive the page:** paragraph elements are rendered by the current page. When the page changes or the book is re-paginated, they are replaced and the selection would point at nothing. So the reader dismisses on any change to the page index or page list, rather than in each way of navigating, which once missed the TOC.
 
-The class also caches one `Range` per selection change, built in `#setSelection`. Every consumer (selection boxes, handles, toolbar, copy and search) reads that cached `Range` instead of walking the paragraph's text nodes again.
+### Text and boxes are built from the paragraphs, not the `Range`
 
-### API
+A `Range` across elements serves neither copying nor painting as-is:
 
-| Member | Description |
-|---|---|
-| `selection` | Current `ActiveSelection`, or `null` |
-| `range` | Cached `Range` for the current selection, or `null` |
-| `subscribe(listener)` | Calls `listener(selection)` after every change; returns an unsubscribe function |
-| `selectWordAtPoint(clientX, clientY)` | Selects the word at a viewport point (long-press, double-click) |
-| `selectByPointerDrag(event)` | From a mouse `pointerdown`: dismisses the open selection, then selects as the pointer drags |
-| `dragHandle(edge, event)` | Starts dragging the `'start'` or `'end'` handle from its `pointerdown` event |
-| `copyActiveSelection()` | Copies the selected text, then dismisses |
-| `searchActiveSelectionInWeb()` | Opens a web search for the selected text, then dismisses |
-| `dismissSelection()` | Clears the selection |
+- **`Range.toString()` joins paragraphs with nothing between them.** The copied text is built paragraph by paragraph instead, adding a line break between paragraphs, or a space before a page-split continuation (pagination splits paragraphs on whitespace and drops it at the split).
+- **`Range.getClientRects()` also returns the box of every element fully inside the range.** Across paragraphs, that's whole paragraph blocks, margins and indents included, and inline elements such as bold text add a second box on top of their own text. Boxes are measured per text node instead, so only the text itself is painted, once.
 
-Listeners are notified only when the selection actually changes. Setting the same object again, dismissing an empty selection, or a drag step that lands on the same offsets notifies no one.
+### Framework-free manager, observed by subscription
 
-### Dragging
+`SelectionManager` holds the selection and exposes it through getters plus `subscribe(listener)`, which returns an unsubscribe function. Listeners are called only when the selection actually changes; a drag that stays on the same character, or dismissing an empty selection, notifies no one.
 
-`dragHandle` and `selectByPointerDrag` share `#trackPointer`, which must stay cheap and must survive re-renders:
+The Solid adapter creates one manager per reader mount, copies the selection and `Range` into signals on each change, unsubscribes on unmount, and exposes the methods bound so they can be passed straight to event props. It holds no selection logic.
 
-- **One update per frame.** Pointer moves arrive faster than the screen repaints, and each hit-test walks the paragraph's text nodes. Moves are stored and applied once per `requestAnimationFrame`; on release, any pending move is applied immediately.
-- **Listeners on `window`.** `pointermove`, `pointerup` and `pointercancel` are listened for on `window`, filtered by `pointerId`, and removed when the drag ends. The handle also takes pointer capture. If the handle element were ever re-created mid-drag, listeners on the element itself would be lost along with it.
-- **Line height read once,** at the start of a handle drag, not on every move.
-- **Mouse drags hit-test at the pointer itself.** Handle drags shift the hit-test point up half a line; mouse drags don't, because the cursor sits on the text it's pointing at.
+### Dragging stays cheap and survives re-renders
 
-## Solid adapter
+Handle drags and mouse drags share the same pointer tracking:
 
-`createSelectionManager()` creates one `SelectionManager` per reader mount and exposes:
+- **At most one update per frame.** Pointer moves arrive faster than the screen repaints, and each hit-test walks a paragraph's text nodes, so only the latest position per animation frame is used. On release, a pending position is applied straight away; when the browser cancels the gesture, it's dropped.
+- **Listening on `window`, filtered by pointer id.** A drag keeps working even if the element that was pressed is replaced mid-gesture, and a drag can continue across other paragraphs and gaps.
 
-- `activeSelection()` and `activeRange()` signals, both updated in a single `batch` on every change,
-- the class's methods, bound, so they can be passed directly as event props,
-- an `onCleanup` that unsubscribes.
+### Copying over plain HTTP
 
-It contains no selection logic.
+The async Clipboard API exists only on secure pages (HTTPS or `localhost`), and Polka is usually served over plain HTTP on the NAS (see [`docs/truenas.md`](../docs/truenas.md)). There, copying falls back to `document.execCommand('copy')` on a temporary off-screen text field.
 
-## Rendering
+Browsers allow `execCommand('copy')` only while handling the user's tap or click. The fallback therefore has to run synchronously from the button's handler: **nothing may be awaited before it**. Copy reports whether it succeeded, and a failure is logged.
 
-- **Selection boxes** are positioned `<div>`s (`.selection-rect`), one per rect from `range.getClientRects()`, with `pointer-events: none`. The CSS Custom Highlight API isn't used because WebKit doesn't reliably paint `::highlight()` on iOS.
-- **The overlay must not be re-created during a drag.** `<Show when={activeRange()}>` in `ReaderPage.tsx` must stay **non-keyed**. The `Range` is a new object on every drag step, and a keyed `Show` would destroy and rebuild the overlay each time, including the handle that holds pointer capture. That stalled drags in an earlier version.
-- **Selection boxes use `<Index>`, not `<For>`.** Each drag step produces new `DOMRect` objects, so `<For>` would recreate every box instead of moving the existing ones.
-- **The toolbar is portalled to `<body>`** with `position: fixed` and `z-index: 250`, which is above the reader and its header (200) and below sheets and modals (300+). `.reader-content` has `overflow: hidden`, which would clip the toolbar when the selection is on the first line and the toolbar needs to reach up over the header.
-- **Handles and the toolbar stop propagation.** Without that, touches on them would reach `.reader-content`'s tap and long-press handling, and a mouse `pointerdown` would dismiss the selection before the toolbar's click lands. Handles stop it inside `dragHandle`; the toolbar stops `pointerdown`, `touchstart`, `touchend` and `click`. In Solid, events from a portal still bubble to where the component is mounted, so the portalled toolbar needs this too.
+## Invariants
 
-## Clipboard
+Each of these fixed a real bug; keep them unless the reason no longer applies.
 
-`copyText(text)` uses `navigator.clipboard.writeText` when it exists. The Clipboard API is only available in secure contexts (HTTPS or `localhost`), and the app is usually served over plain HTTP on the NAS (see [`docs/truenas.md`](../docs/truenas.md)). There, it falls back to `document.execCommand('copy')` on a temporary off-screen `<textarea>`:
-
-- `readOnly`, so iOS doesn't open the keyboard,
-- `font-size: 16px`, so iOS doesn't zoom in,
-- an explicit `setSelectionRange`, because iOS ignores `select()` on a read-only field,
-- removed straight after copying.
-
-It returns whether the copy succeeded. `copyActiveSelection` logs an error when it fails.
+- **The selection UI must not re-mount while it's open.** The `<Show>` around the overlay and toolbar stays non-keyed, and the selection boxes use `<Index>` rather than `<For>`. The `Range` and its rects are new objects on every drag step. A keyed `<Show>` would rebuild the overlay each time, destroying the handle mid-drag and stalling it. `<For>` would recreate every box instead of moving it.
+- **The toolbar renders outside the reading area.** It's portalled to `<body>` with fixed positioning. The reading area clips its overflow, which would cut the toolbar off on the first line. It's layered above the reader and its header and below sheets and modals.
+- **Presses on the handles and toolbar don't reach the reading area.** Both stop touch and pointer events from propagating. Otherwise a touch on them would count as a tap or start a long-press, and a mouse press would dismiss the selection before the toolbar's click landed. Solid bubbles events from a portal to where it's mounted, so the portalled toolbar needs this too.
+- **Selection boxes don't catch input** (`pointer-events: none`), so taps go to the text underneath.
+- **Boxes are drawn as positioned elements,** not with the CSS Custom Highlight API, which WebKit doesn't reliably paint on iOS.
+- **Boxes are measured from text nodes only,** never with `getClientRects()` on the whole `Range`, which would paint entire paragraphs as blocks (see above).
 
 ## Not supported
 
-- Selections that span more than one paragraph, or both pages of the two-page spread.
-- Saving highlights. An earlier version stored highlights in IndexedDB; it was removed, and the database stays at version 1.
+- Extending a selection beyond the visible page(s). Turning the page closes it.
+- Copying with Cmd/Ctrl+C; only the toolbar copies.
+- Selecting with the keyboard or a screen reader.
+- Choosing a different search engine.
+- Saving selections as highlights. An earlier version stored them in IndexedDB; it was removed because nothing used them yet.
 
-## Tests
+## Testing
 
-- [`selection-manager.test.ts`](../apps/client/src/lib/selection-manager.test.ts): word selection, ignoring whitespace, notification rules, unsubscribe, and mouse drag selection (both directions, one update per frame, plain click, dismissal on press, touch ignored).
-- [`text-offsets.test.ts`](../apps/client/src/lib/text-offsets.test.ts): offset ↔ `Range`, point → offset, word bounds.
-- [`copy-text.test.ts`](../apps/client/src/lib/copy-text.test.ts): Clipboard API path, `execCommand` fallback, refusal.
-
-jsdom has no layout or `PointerEvent`, so tests stub `document.elementFromPoint` and `document.caretRangeFromPoint`, and build pointer events from `MouseEvent`. Touch dragging, rendering and the clipboard fallback are checked by hand on iOS Safari; mouse selection can also be driven with Playwright against the dev server.
+jsdom has no layout and no `PointerEvent`. Unit tests stub hit-testing (`document.caretRangeFromPoint`) and build pointer events from `MouseEvent`, which covers the manager's logic but not real gestures. Touch gestures, rendering and the clipboard fallback need checking on a real device (iOS Safari); mouse selection can be driven with Playwright against the dev server.

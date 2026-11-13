@@ -36,4 +36,5 @@ Each screen is a short block in `main()` in `scripts/take-screenshots.ts`: navig
 
 - Route fakes match `/api/` at the start of the path. A `**/api/**` pattern would also catch the dev server's source files under `src/lib/api/` and break the app.
 - Footnote links render with zero height, so Playwright treats them as hidden. The script finds them by position and dispatches the click directly.
+- Playwright has no long-press or touch drag, so the text selection screen sends raw touches through the Chrome DevTools Protocol (`Input.dispatchTouchEvent`). It aims at words by their index in the paragraph, so if the book's layout or the chosen chapter changes, check that the selection still covers a whole sentence.
 - Before each capture the script moves the mouse away and clears focus, so no hover highlight or focus ring shows up in the image.

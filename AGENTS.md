@@ -1,5 +1,10 @@
 # Code guidelines
 
+Detailed specs live in [`specs/`](specs/) and are part of these guidelines. Read a spec only when the change touches the files it covers:
+
+- [JavaScript / TypeScript](specs/javascript-typescript.md), when changing `*.js`, `*.jsx`, `*.ts` or `*.tsx` files
+- [Text selection](specs/text-selection.md), when changing the reader's text selection: `selection-manager.ts`, `create-selection-manager.ts`, `text-offsets.ts`, `copy-text.ts`, `SelectionOverlay.tsx`, `SelectionToolbar.tsx`, or the selection wiring in `ReaderPage.tsx`
+
 ## Philosophy
 
 - **Descriptive names > brevity** — a name that explains what something is or does is always better than a short one. Avoid abbreviations and single-letter variables outside of trivial loop counters.

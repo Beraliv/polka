@@ -493,6 +493,17 @@ h5.reader-section-title {
   text-indent: 1.5em;
   text-align: justify;
   hyphens: auto;
+  /* Selection is fully custom-drawn (see .selection-handle/-toolbar below),
+     so native selection and iOS's long-press callout must stay out of the way. */
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Hints that text can be selected by dragging, on devices with a mouse. */
+@media (hover: hover) and (pointer: fine) {
+  .reader-paragraph {
+    cursor: text;
+  }
 }
 
 /* Continuation of a paragraph split across a page boundary */
@@ -522,6 +533,71 @@ h5.reader-section-title {
     padding: 32px 64px;
     font-size: 1.1rem;
   }
+}
+
+/* ---- Text selection ---- */
+
+/* Painted as plain positioned divs (from Range.getClientRects()) rather than
+   via the CSS Custom Highlight API — WebKit's ::highlight() implementation
+   doesn't reliably paint on iOS, even given a StaticRange. pointer-events:
+   none keeps them from intercepting taps meant for the text underneath. */
+.selection-rect {
+  position: absolute;
+  pointer-events: none;
+  z-index: 40;
+  background-color: rgba(167, 139, 250, 0.55);
+}
+
+.selection-handle {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, 0);
+  cursor: grab;
+  touch-action: none;
+  z-index: 60;
+}
+
+.selection-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translateX(-50%);
+}
+
+.selection-toolbar {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  display: flex;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  /* Above .reader (200) and its header, below sheets and modals (300+). */
+  z-index: 250;
+}
+
+.selection-toolbar-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: calc(var(--radius) - 4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+  transition: background 0.15s;
+}
+
+.selection-toolbar-btn:hover,
+.selection-toolbar-btn:active {
+  background: var(--surface2);
 }
 
 /* ---- Table of contents sheet ---- */

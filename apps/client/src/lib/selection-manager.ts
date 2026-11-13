@@ -210,6 +210,18 @@ export class SelectionManager {
   }
 
   /**
+   * Returns the selected text, trimmed, and closes the selection, for actions
+   * that run outside the manager (e.g. Explain). Returns '' once the
+   * selection is gone, so a tap that fires both `touchend` and `click` acts
+   * only once.
+   */
+  takeSelectedText(): string {
+    const text = this.#selectionText().trim();
+    this.#setSelection(null);
+    return text;
+  }
+
+  /**
    * Follows one pointer until it's released, calling `onPoint` with its
    * latest position at most once per frame. Pointer moves arrive far more
    * often than frames are painted, and each hit-test walks the paragraph's

@@ -18,10 +18,12 @@ import { CloseIcon } from './CloseIcon.tsx';
 import { TocIcon } from './TocIcon.tsx';
 import { SelectionOverlay } from './SelectionOverlay.tsx';
 import { SelectionToolbar } from './SelectionToolbar.tsx';
+import { ExplanationSheet } from './ExplanationSheet.tsx';
 import { store, setStore, BookStore } from '../store/books.ts';
 import { saveProgress, resolveBestProgress, progressFraction } from '../lib/progress.ts';
 import { BookFilesDB } from '../lib/polka-db.ts';
 import { createSelectionManager } from '../lib/create-selection-manager.ts';
+import { createExplanationManager } from '../lib/create-explanation-manager.ts';
 import {
   parseBook,
   decodeImageAssets,
@@ -523,6 +525,21 @@ export function ReaderPage() {
   let longPressFired = false;
 
   const selectionManager = createSelectionManager();
+  const explanationManager = createExplanationManager();
+
+  function explainSelection() {
+    const passage = selectionManager.takeSelectedText();
+    if (!passage) {
+      return;
+    }
+    const currentBook = book();
+    void explanationManager.explain({
+      passage,
+      bookName: currentBook?.name ?? '',
+      author: currentBook?.author,
+      language: store.explanationLanguage,
+    });
+  }
   // A selection points at a rendered paragraph element, which is gone once
   // the page changes or the book is re-paginated. Watching the page state
   // itself, rather than dismissing in each navigation function, covers every
@@ -726,25 +743,26 @@ export function ReaderPage() {
 
     void init();
 
+    // Page-turn keys do nothing while something sits over the page, so a
+    // stray key press can't change the page underneath it.
+    const isPageTurnBlocked = () =>
+      Boolean(
+        activeNoteId() ||
+        fullscreenImageId() ||
+        tocOpen() ||
+        explanationManager.explanation() ||
+        selectionManager.activeSelection(),
+      );
+
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
-        if (
-          activeNoteId() ||
-          fullscreenImageId() ||
-          tocOpen() ||
-          selectionManager.activeSelection()
-        ) {
+        if (isPageTurnBlocked()) {
           return;
         }
         event.preventDefault();
         nextPage();
       } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
-        if (
-          activeNoteId() ||
-          fullscreenImageId() ||
-          tocOpen() ||
-          selectionManager.activeSelection()
-        ) {
+        if (isPageTurnBlocked()) {
           return;
         }
         event.preventDefault();
@@ -756,6 +774,8 @@ export function ReaderPage() {
           setActiveNoteId(null);
         } else if (tocOpen()) {
           setTocOpen(false);
+        } else if (explanationManager.explanation()) {
+          explanationManager.closeExplanation();
         } else if (selectionManager.activeSelection()) {
           selectionManager.dismissSelection();
         } else {
@@ -996,6 +1016,7 @@ export function ReaderPage() {
                   containerRect={containerRect}
                   onCopy={() => void selectionManager.copyActiveSelection()}
                   onSearchInWeb={selectionManager.searchActiveSelectionInWeb}
+                  onExplain={explainSelection}
                 />
               </>
             );
@@ -1077,6 +1098,18 @@ export function ReaderPage() {
               </button>
             </div>
           </div>
+        )}
+      </Show>
+
+      {/* Not keyed: the explanation is a new object on every streamed
+          chunk, and a keyed Show would remount the sheet each time, losing
+          a swipe in progress and the body's scroll position. */}
+      <Show when={explanationManager.explanation()}>
+        {(explanation) => (
+          <ExplanationSheet
+            explanation={explanation()}
+            onClose={explanationManager.closeExplanation}
+          />
         )}
       </Show>
     </div>

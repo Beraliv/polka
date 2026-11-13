@@ -2,6 +2,7 @@ import type { Component } from 'solid-js';
 import type { KeyWithoutPlaceholders } from '../i18n';
 import { NasConfigurationSettings } from '../components/settings/NasConfigurationSettings.tsx';
 import { DeveloperSettings } from '../components/settings/DeveloperSettings.tsx';
+import { ExplanationSettings } from '../components/settings/ExplanationSettings.tsx';
 
 interface SettingsNodeBase {
   id: string;
@@ -33,6 +34,12 @@ export const settingsRoot: SettingsGroupNode = {
       id: 'nas',
       labelKey: 'settings.nasConfigLabel',
       component: NasConfigurationSettings,
+    },
+    {
+      type: 'page',
+      id: 'explanation',
+      labelKey: 'settings.explanationLabel',
+      component: ExplanationSettings,
     },
     {
       type: 'page',

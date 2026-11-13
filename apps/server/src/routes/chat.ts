@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import Anthropic from '@anthropic-ai/sdk';
 import { PassThrough } from 'stream';
 import {
@@ -10,14 +10,11 @@ import {
   type ChatStopReason,
   type ChatStreamEvent,
 } from '@polka/shared';
+import { anthropicClient } from '../lib/anthropic-client.ts';
 
 const SYSTEM_PROMPT =
   'You are a helpful assistant built into Polka, a personal e-book reader app. Be concise and friendly. ' +
   'The chat UI renders plain text only, so never use markdown formatting (no **bold**, no # headings, no bullet/numbered lists with - or *).';
-
-// Constructed once at startup — the SDK reads ANTHROPIC_API_KEY from the
-// environment itself, so a missing key is only detectable by trying.
-const client = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
 
 // One schema per supported block type, so a client can't send a block the
 // server doesn't know how to pass to Claude. Typed as a Record over
@@ -92,7 +89,11 @@ export function toAnthropicMessages(messages: ChatMessage[]): Anthropic.MessageP
   });
 }
 
-export function toChatStopReason(stopReason: Anthropic.StopReason | null): ChatStopReason {
+// Also takes the beta stop reasons, for routes on the beta Messages API (e.g.
+// explain, for refusal fallbacks).
+export function toChatStopReason(
+  stopReason: Anthropic.StopReason | Anthropic.Beta.BetaStopReason | null,
+): ChatStopReason {
   switch (stopReason) {
     case 'max_tokens':
     case 'model_context_window_exceeded':
@@ -106,7 +107,29 @@ export function toChatStopReason(stopReason: Anthropic.StopReason | null): ChatS
   }
 }
 
-function writeStreamEvent(body: PassThrough, event: ChatStreamEvent) {
+/**
+ * Stops Claude when the client goes away. The client cancels a reply by
+ * dropping the connection (leaving the chat, closing the explanation sheet);
+ * without this, Claude keeps generating, and billing, until the reply ends.
+ * Listens on the response, not the request: a request emits `close` as soon
+ * as its body has been read. The response also closes after a normal finish,
+ * which `writableFinished` tells apart.
+ */
+export function abortOnDisconnect({
+  reply,
+  stream,
+}: {
+  reply: FastifyReply;
+  stream: { abort: () => void };
+}) {
+  reply.raw.once('close', () => {
+    if (!reply.raw.writableFinished) {
+      stream.abort();
+    }
+  });
+}
+
+export function writeStreamEvent(body: PassThrough, event: ChatStreamEvent) {
   body.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
 }
 
@@ -115,7 +138,7 @@ export async function chatRoutes(app: FastifyInstance) {
     '/',
     { schema: { body: chatRequestBodySchema } },
     async (req, reply) => {
-      if (!client) {
+      if (!anthropicClient) {
         return reply.code(500).send({ error: 'ANTHROPIC_API_KEY is not configured on the server' });
       }
 
@@ -137,12 +160,13 @@ export async function chatRoutes(app: FastifyInstance) {
         .send(body);
 
       try {
-        const stream = client.messages.stream({
+        const stream = anthropicClient.messages.stream({
           model: 'claude-opus-5',
           max_tokens: 4096,
           system: SYSTEM_PROMPT,
           messages,
         });
+        abortOnDisconnect({ reply, stream });
 
         for await (const event of stream) {
           // Only text blocks are forwarded. The reply also holds thinking blocks
@@ -165,6 +189,10 @@ export async function chatRoutes(app: FastifyInstance) {
           stopReason: toChatStopReason(finalMessage.stop_reason),
         });
       } catch (err) {
+        // Aborted because the client left; there's no one to tell.
+        if (err instanceof Anthropic.APIUserAbortError) {
+          return;
+        }
         writeStreamEvent(body, {
           type: 'error',
           error: err instanceof Error ? err.message : String(err),

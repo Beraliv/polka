@@ -1,5 +1,6 @@
 import { Portal } from 'solid-js/web';
 import { CopyIcon } from './CopyIcon.tsx';
+import { ExplainIcon } from './ExplainIcon.tsx';
 import { GlobeIcon } from './GlobeIcon.tsx';
 import { i18n } from '../i18n';
 
@@ -8,12 +9,13 @@ type SelectionToolbarProps = {
   containerRect: DOMRect;
   onCopy: () => void;
   onSearchInWeb: () => void;
+  onExplain: () => void;
 };
 
 const TOOLBAR_GAP_PX = 8;
-// Rough half-width used to keep the toolbar's centered anchor point from
-// pushing it past the container edge; the toolbar itself is narrow enough
-// that an approximation is fine here.
+// Rough half-width (three buttons) used to keep the toolbar's centered
+// anchor point from pushing it past the container edge; the toolbar itself is
+// narrow enough that an approximation is fine here.
 const TOOLBAR_HALF_WIDTH_PX = 60;
 
 function stopPropagation(event: Event) {
@@ -63,6 +65,15 @@ export function SelectionToolbar(props: SelectionToolbarProps) {
           aria-label={i18n('reader.searchInWebTooltip')}
         >
           <GlobeIcon />
+        </button>
+        <button
+          class="selection-toolbar-btn"
+          onClick={props.onExplain}
+          onTouchEnd={props.onExplain}
+          title={i18n('reader.explainTooltip')}
+          aria-label={i18n('reader.explainTooltip')}
+        >
+          <ExplainIcon />
         </button>
       </div>
     </Portal>

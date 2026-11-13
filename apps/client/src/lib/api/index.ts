@@ -6,3 +6,4 @@ export { fetchSMBConfig } from './fetchSMBConfig.ts';
 export { saveSMBConfig } from './saveSMBConfig.ts';
 export { deleteSMBConfig } from './deleteSMBConfig.ts';
 export { sendChatMessage } from './sendChatMessage.ts';
+export { explainPassage } from './explainPassage.ts';

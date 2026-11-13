@@ -111,3 +111,44 @@ export type ChatStreamEvent =
   | { type: 'text_delta'; text: string }
   | { type: 'message_end'; stopReason: ChatStopReason }
   | { type: 'error'; error: string };
+
+// Languages Claude can explain a selected passage in. The setting picks one by
+// `code`; the server tells Claude the `englishName`, and the settings list
+// shows each language by its own name, so it's recognisable whatever language
+// the app is in.
+//
+// Sorted by approximate total speakers worldwide (native plus second
+// language, rounded from Ethnologue), most first, and the settings list keeps
+// this order, so the most likely choices come first. A new language goes in
+// at its place by speakers, not at the end.
+export const EXPLANATION_LANGUAGES = [
+  { code: 'en', englishName: 'English', nativeName: 'English' },
+  { code: 'es', englishName: 'Spanish', nativeName: 'Español' },
+  { code: 'fr', englishName: 'French', nativeName: 'Français' },
+  { code: 'pt', englishName: 'Portuguese', nativeName: 'Português' },
+  { code: 'ru', englishName: 'Russian', nativeName: 'Русский' },
+  { code: 'de', englishName: 'German', nativeName: 'Deutsch' },
+  { code: 'it', englishName: 'Italian', nativeName: 'Italiano' },
+  { code: 'pl', englishName: 'Polish', nativeName: 'Polski' },
+  { code: 'uk', englishName: 'Ukrainian', nativeName: 'Українська' },
+  { code: 'nl', englishName: 'Dutch', nativeName: 'Nederlands' },
+] as const;
+
+export type ExplanationLanguageCode = (typeof EXPLANATION_LANGUAGES)[number]['code'];
+
+export const DEFAULT_EXPLANATION_LANGUAGE: ExplanationLanguageCode = 'en';
+
+export function isExplanationLanguageCode(code: unknown): code is ExplanationLanguageCode {
+  return EXPLANATION_LANGUAGES.some((language) => language.code === code);
+}
+
+export type ExplainRequest = {
+  // The selected passage, as the reader copied it.
+  passage: string;
+  bookName: string;
+  author?: string;
+  language: ExplanationLanguageCode;
+};
+
+// `POST /api/explain` replies with the same Server-Sent Events as
+// `POST /api/chat` (ChatStreamEvent), so both share one client-side reader.

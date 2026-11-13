@@ -32,5 +32,6 @@ export function createSelectionManager() {
     selectByPointerDrag: manager.selectByPointerDrag.bind(manager),
     selectWordAtPoint: manager.selectWordAtPoint.bind(manager),
     selectWordOnDoubleClick: manager.selectWordOnDoubleClick.bind(manager),
+    takeSelectedText: manager.takeSelectedText.bind(manager),
   };
 }

@@ -25,14 +25,18 @@ services:
     image: beraliv/polka-client:latest
     ports:
       - '8080:80'
+    pull_policy: always
     restart: unless-stopped
   server:
     environment:
+      ANTHROPIC_API_KEY: ANTHROPIC_API_KEY
       HOST: 0.0.0.0
       PORT: '3001'
       PROGRESS_PATH: /data/progress
+      SMB_CONFIG_ENCRYPTION_KEY: SMB_CONFIG_ENCRYPTION_KEY
       SMB_CONFIG_PATH: /data/smb
     image: beraliv/polka-server:latest
+    pull_policy: always
     restart: unless-stopped
     volumes:
       - /mnt/<pool>/apps/polka/progress:/data/progress
@@ -93,7 +97,7 @@ Then in the UI open **Apps → Installed → polka → Edit** (on the Applicatio
 
 ## Updating
 
-New images are published to Docker Hub automatically by CI whenever an app's version is bumped on `main`. To update, hit **Update** on the app in **Apps → Restart App** to pull the new `:latest`.
+New images are published to Docker Hub automatically by CI whenever an app's version is bumped on `main`. The config uses the `:latest` tag with `pull_policy: always`, so restarting the app pulls the newer `:latest` images instead of reusing the copies cached on the NAS. Check the new version in Polka's **Settings (⚙)** footer.
 
 The Update dialog always shows **1.0.0 / custom** with no versions to pick — that is expected for YAML custom apps, which have no catalog behind them, and it does not reflect Polka's real version. To see which version is actually running, open Polka's **Settings (⚙)** page — the footer shows the client and server versions — or run `curl http://<nas-ip>:8080/api/version`.
 

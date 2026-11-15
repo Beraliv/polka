@@ -212,6 +212,11 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Built
 
   // Mirror the real page element's computed styles so measurements are accurate
   const computedStyle = window.getComputedStyle(pageEl);
+  // The ratio, not the computed pixel value: a pixel line-height is inherited as-is,
+  // so a chapter heading (larger font) would get a shorter line box than on the real
+  // page, which inherits the ratio. That made chapter-first pages overflow and clip
+  // their last line.
+  const lineHeightRatio = parseFloat(computedStyle.lineHeight) / parseFloat(computedStyle.fontSize);
   const container = document.createElement('div');
   container.style.cssText = [
     'position:fixed',
@@ -223,7 +228,7 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Built
     `padding:${computedStyle.paddingTop} ${computedStyle.paddingRight} ${computedStyle.paddingBottom} ${computedStyle.paddingLeft}`,
     `font-family:${computedStyle.fontFamily}`,
     `font-size:${computedStyle.fontSize}`,
-    `line-height:${computedStyle.lineHeight}`,
+    `line-height:${lineHeightRatio}`,
     'overflow:visible',
     'height:auto',
   ].join(';');

@@ -101,6 +101,56 @@ The Update dialog always shows **1.0.0 / custom** with no versions to pick — t
 
 Logs, version checks, API smoke tests, and common failures are covered in [truenas-debugging.md](./truenas-debugging.md).
 
+## Enabling HTTPS
+
+Browsers only register the service worker (and so offer "Add to Home Screen" offline support) on HTTPS. [Tailscale Services](https://tailscale.com/docs/features/tailscale-services) can serve the app over HTTPS on your tailnet with a trusted certificate that Tailscale obtains from Let's Encrypt and renews automatically before it expires, so no cron job or manual certificate import is needed. Nothing is exposed to the public internet: the address works only for devices on your tailnet.
+
+Each Tailscale Service gets its own name (`<name>.<tailnet>.ts.net`) and its own Tailscale IP, so Polka can use port 443 even though TrueNAS's web UI already occupies it.
+
+Prerequisites:
+
+- The `tailscale` TrueNAS app (community train) is installed and running with host networking. Run the commands below from **Apps → tailscale → Shell**.
+- HTTPS certificates and MagicDNS are enabled for your tailnet in the Tailscale admin console.
+- The TrueNAS host is tagged `tag:nas`, which Tailscale Services requires.
+
+Steps:
+
+1. **Define the service.** In the Tailscale admin console, open **Services → Add service**. Name it `polka`, set the port to `tcp:443`, and add no tags.
+2. **Advertise it from the NAS.** In the `tailscale` app shell, point the service at the client container's host port:
+
+   ```
+   tailscale serve --service=svc:polka --https=443 http://127.0.0.1:8080
+   ```
+
+3. **Approve the host.** Back in the admin console, open the `polka` service and click **Approve…** next to the NAS. Its status should change to **Online**.
+4. **Verify from a device on your tailnet:**
+
+   ```
+   curl -sS https://polka.<tailnet>.ts.net/ -o /dev/null -w "%{http_code} verify=%{ssl_verify_result}\n"
+   ```
+
+   `verify=0` means the certificate is trusted. Then open `https://polka.<tailnet>.ts.net` in the browser and use **Add to Home Screen**.
+
+Useful commands on the NAS:
+
+```
+# List what is being served
+tailscale serve status
+
+# Stop serving a service on this host
+tailscale serve clear svc:polka
+```
+
+To remove the service completely, clear it on the host, then delete it under **Services** in the admin console.
+
+Notes:
+
+- Serve configuration is stored in `/var/lib/tailscale`, which should be on a persistent dataset, so it survives app restarts. After a reboot, run `tailscale serve status` to confirm the service came back.
+- Plain HTTP stays available at `http://<nas-ip>:8080` as a fallback. Browser storage is per address, so reading progress and offline data saved over HTTP do not appear on the HTTPS address.
+- Polka calls its API with relative paths (`/api/...`), so it needs no configuration change for HTTPS.
+- If Chrome still shows "Not secure" with a valid certificate, it may have cached a warning bypass for the whole hostname from an earlier self-signed certificate warning. Fully quit and reopen Chrome, or clear the site's data at `chrome://settings/content/all`.
+- Tailscale access depends on the `tailscale` app running. Away from home with the app down, there is no access to the NAS until it is back on the network.
+
 ## Known limitations
 
-- **PWA install requires HTTPS.** Over plain `http://<nas-ip>:8080` the service worker will not register, so "Add to Home Screen" offline support is unavailable. Reading works fine. To fix, serve the app through HTTPS — e.g. a reverse proxy with a certificate
+- **PWA install requires HTTPS.** Over plain `http://<nas-ip>:8080` the service worker will not register, so "Add to Home Screen" offline support is unavailable. Reading works fine. To fix, serve the app over HTTPS — see [Enabling HTTPS](#enabling-https)

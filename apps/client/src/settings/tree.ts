@@ -3,6 +3,7 @@ import type { KeyWithoutPlaceholders } from '../i18n';
 import { NasConfigurationSettings } from '../components/settings/NasConfigurationSettings.tsx';
 import { DeveloperSettings } from '../components/settings/DeveloperSettings.tsx';
 import { ExplanationSettings } from '../components/settings/ExplanationSettings.tsx';
+import { ReadingSettingsPage } from '../components/settings/ReadingSettings.tsx';
 
 interface SettingsNodeBase {
   id: string;
@@ -40,6 +41,12 @@ export const settingsRoot: SettingsGroupNode = {
       id: 'explanation',
       labelKey: 'settings.explanationLabel',
       component: ExplanationSettings,
+    },
+    {
+      type: 'page',
+      id: 'reading',
+      labelKey: 'settings.readingLabel',
+      component: ReadingSettingsPage,
     },
     {
       type: 'page',

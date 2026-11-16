@@ -23,6 +23,7 @@ import { store, setStore, BookStore } from '../store/books.ts';
 import { saveProgress, resolveBestProgress, progressFraction } from '../lib/progress.ts';
 import { BookFilesDB } from '../lib/polka-db.ts';
 import { createSelectionManager } from '../lib/create-selection-manager.ts';
+import { readingStyleProperties } from '../lib/reading-settings.ts';
 import { createExplanationManager } from '../lib/create-explanation-manager.ts';
 import {
   parseBook,
@@ -919,7 +920,7 @@ export function ReaderPage() {
   };
 
   return (
-    <div class="reader">
+    <div class="reader reading-theme" style={readingStyleProperties(store.readingSettings)}>
       <div class="reader-header">
         <button
           class="icon-btn"

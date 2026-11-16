@@ -42,7 +42,7 @@ Applies to the reader page only. The app's own chrome keeps its current dark pal
 | Dark | `#0f172a` | `#f1f5f9` | **default**; equals `--bg` / `--text` today |
 | Black | `#000000` | `#e5e5e5` | true black for OLED |
 
-Muted text (`--text-muted`, page numbers, section hints) follows the theme's text colour at reduced opacity, so it stays legible on every background.
+Muted text (`--text-muted`, page numbers, section hints), and the surfaces and borders of the reader's sheets and popups, each have their own colour per theme, so they stay legible on every background. Mixing them from the text colour would change the dark theme's exact values.
 
 ### Font
 
@@ -75,7 +75,7 @@ The step, not the raw value, is what gets stored, so a future change to a step's
 
 ### Line spacing
 
-A slider from `0.8` to `2.5`, step `0.1`, default `1.85`. Stored as a number. The preview updates while dragging.
+A slider from `0.8` to `2.5`, step `0.05`, default `1.85`. The step is `0.05` rather than `0.1` because stepping from `0.8` in `0.1` never reaches the default `1.85`. Stored as a number. The preview updates while dragging.
 
 ### Margins
 

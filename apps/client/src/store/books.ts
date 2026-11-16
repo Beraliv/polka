@@ -8,6 +8,7 @@ import {
   type SMBConfigSummary,
 } from '@polka/shared';
 import type { SectionItem, TocEntry, Note } from '../lib/book';
+import { normalizeReadingSettings, type ReadingSettings } from '../lib/reading-settings.ts';
 import { BookFilesDB, ProgressDB } from '../lib/polka-db.ts';
 import {
   fetchSMBConfig,
@@ -18,6 +19,7 @@ import {
 const BOOKS_KEY = 'polka:books';
 const SERVER_URL_KEY = 'polka:server-url';
 const EXPLANATION_LANGUAGE_KEY = 'polka:explanation-language';
+const READING_SETTINGS_KEY = 'polka:reading-settings';
 /**
  * @deprecated Older versions of the client stored the NAS password in localStorage
  * under this key. It is no longer used. See https://github.com/Beraliv/polka/issues/7
@@ -43,6 +45,12 @@ function loadExplanationLanguage(): ExplanationLanguageCode {
   return isExplanationLanguageCode(stored) ? stored : DEFAULT_EXPLANATION_LANGUAGE;
 }
 
+// Stored values come from an older or newer client, or a hand-edited file, so
+// they are normalised rather than trusted.
+function loadReadingSettings(): ReadingSettings {
+  return normalizeReadingSettings(load<unknown>(READING_SETTINGS_KEY, null));
+}
+
 try {
   localStorage.removeItem(LEGACY_SMB_KEY);
 } catch {
@@ -56,6 +64,7 @@ const [store, setStore] = createStore({
   smbStatus: null as SMBConfigSummary | null,
   serverUrl: load<string>(SERVER_URL_KEY, ''),
   explanationLanguage: loadExplanationLanguage(),
+  readingSettings: loadReadingSettings(),
   sections: {} as Record<string, SectionItem[]>,
   toc: {} as Record<string, TocEntry[]>,
   notes: {} as Record<string, Record<string, Note>>,
@@ -185,6 +194,20 @@ export class BookStore {
       );
     }
     setStore('explanationLanguage', language);
+  }
+
+  // Writes every field in one update, so resetting to defaults is a single
+  // change to the store and to storage.
+  static saveReadingSettings(settings: ReadingSettings): void {
+    try {
+      localStorage.setItem(READING_SETTINGS_KEY, JSON.stringify(settings));
+    } catch (error) {
+      console.error(
+        '[saveReadingSettings] Failed to save reading settings to local storage:',
+        error,
+      );
+    }
+    setStore('readingSettings', settings);
   }
 
   static async loadSMBStatus(): Promise<void> {

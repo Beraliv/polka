@@ -6,6 +6,23 @@
   padding: 0;
 }
 
+/* Bundled, not fetched from a CDN, so the reader works offline. */
+@font-face {
+  font-family: 'Montserrat';
+  src: url('/fonts/montserrat-latin-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Source Serif 4';
+  src: url('/fonts/source-serif-4-latin-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* Prevents pinch-zoom and double-tap-zoom */
   touch-action: pan-x pan-y;
@@ -358,6 +375,17 @@ a {
 
 /* ---- Reader ---- */
 
+.reading-theme {
+  --bg: var(--reader-background);
+  --text: var(--reader-text);
+  --text-muted: var(--reader-muted);
+  --surface: var(--reader-surface);
+  --surface2: var(--reader-border);
+  --border: var(--reader-border);
+  background: var(--reader-background);
+  color: var(--reader-text);
+}
+
 .reader {
   position: fixed;
   inset: 0;
@@ -393,13 +421,17 @@ a {
   user-select: none;
 }
 
+/* Font, size, spacing and margins come from the Reading settings; see
+   lib/reading-settings.ts. The bottom gap stays fixed on mobile, and follows
+   the margin preset on desktop, as it always has. */
 .reader-content {
   flex: 1;
   overflow: hidden;
-  padding: 0.75rem 2rem var(--reader-page-vertical-gap);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 1.05rem;
-  line-height: 1.85;
+  padding: var(--reader-margin-mobile-vertical) var(--reader-margin-mobile-horizontal)
+    var(--reader-page-vertical-gap);
+  font-family: var(--reader-font-family);
+  font-size: var(--reader-font-size-mobile);
+  line-height: var(--reader-line-height);
   position: relative;
 }
 
@@ -423,7 +455,7 @@ a {
   height: 3.5rem;
   border-radius: 999px;
   border: none;
-  color: #fff;
+  color: var(--text);
   font-size: 1.3rem;
   display: flex;
   align-items: center;
@@ -449,7 +481,7 @@ a {
 }
 
 .reader-nav-overlay:hover {
-  background: #303030;
+  background: var(--reader-navigation-hover);
 }
 
 .reader-nav-overlay--prev {
@@ -491,7 +523,7 @@ h5.reader-section-title {
 
 .reader-paragraph {
   text-indent: 1.5em;
-  text-align: justify;
+  text-align: var(--reader-text-align);
   hyphens: auto;
   /* Selection is fully custom-drawn (see .selection-handle/-toolbar below),
      so native selection and iOS's long-press callout must stay out of the way. */
@@ -530,8 +562,8 @@ h5.reader-section-title {
 /* Height guard keeps landscape phones (~400px tall) out of the desktop layout. */
 @media (min-width: 900px) and (min-height: 500px) {
   .reader-content {
-    padding: 32px 64px;
-    font-size: 1.1rem;
+    padding: var(--reader-margin-desktop-vertical) var(--reader-margin-desktop-horizontal);
+    font-size: var(--reader-font-size-desktop);
   }
 }
 
@@ -770,6 +802,47 @@ h5.reader-section-title {
 
 .explanation-error {
   color: var(--danger);
+}
+
+/* ---- Settings: reading ---- */
+
+.reading-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.reading-section-heading {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.reading-section-value {
+  text-transform: none;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.reading-preview {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* Fixed height, so every section's preview is the same size; the text is
+   clipped at the bottom, as it is in the reader. */
+.reading-preview-content {
+  height: 11rem;
+}
+
+.reading-slider {
+  width: 100%;
+  accent-color: var(--accent);
 }
 
 /* ---- Settings: explanation language ---- */

@@ -47,6 +47,7 @@ describe('readingStyleProperties', () => {
     expect(properties).toMatchObject({
       '--reader-background': '#0f172a',
       '--reader-text': '#f1f5f9',
+      '--reader-navigation-hover': '#303030',
       '--reader-font-family': "Georgia, 'Times New Roman', serif",
       '--reader-font-size-mobile': '1.05rem',
       '--reader-font-size-desktop': '1.1rem',

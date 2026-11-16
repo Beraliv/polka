@@ -42,7 +42,7 @@ Applies to the reader page only. The app's own chrome keeps its current dark pal
 | Dark | `#0f172a` | `#f1f5f9` | **default**; equals `--bg` / `--text` today |
 | Black | `#000000` | `#e5e5e5` | true black for OLED |
 
-Muted text (`--text-muted`, page numbers, section hints), and the surfaces and borders of the reader's sheets and popups, each have their own colour per theme, so they stay legible on every background. Mixing them from the text colour would change the dark theme's exact values.
+Muted text (`--text-muted`, page numbers, section hints), the surfaces and borders of the reader's sheets and popups, and the hover fill of the previous and next page arrows, each have their own colour per theme, so they stay legible on every background. Mixing them from the text colour would change the dark theme's exact values.
 
 ### Font
 

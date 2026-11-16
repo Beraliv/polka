@@ -50,7 +50,14 @@ export const READING_MARGINS: readonly ReadingMargins[] = ['small', 'normal', 'l
 // text colour, so the dark theme keeps the exact values the app has always used.
 const THEME_COLOURS: Record<
   ReadingTheme,
-  { background: string; text: string; muted: string; surface: string; border: string }
+  {
+    background: string;
+    text: string;
+    muted: string;
+    surface: string;
+    border: string;
+    navigationHover: string;
+  }
 > = {
   white: {
     background: '#ffffff',
@@ -58,6 +65,7 @@ const THEME_COLOURS: Record<
     muted: '#6b6b6b',
     surface: '#f1f1f1',
     border: '#dcdcdc',
+    navigationHover: '#e5e5e5',
   },
   light: {
     background: '#f4f1ea',
@@ -65,6 +73,7 @@ const THEME_COLOURS: Record<
     muted: '#7a7468',
     surface: '#e9e4d8',
     border: '#d6cfbf',
+    navigationHover: '#e4ddcc',
   },
   dark: {
     background: '#0f172a',
@@ -72,6 +81,7 @@ const THEME_COLOURS: Record<
     muted: '#94a3b8',
     surface: '#1e293b',
     border: '#334155',
+    navigationHover: '#303030',
   },
   black: {
     background: '#000000',
@@ -79,6 +89,7 @@ const THEME_COLOURS: Record<
     muted: '#8a8a8a',
     surface: '#141414',
     border: '#2a2a2a',
+    navigationHover: '#1c1c1c',
   },
 };
 
@@ -149,6 +160,7 @@ export function readingStyleProperties(settings: ReadingSettings): Record<string
     '--reader-muted': colours.muted,
     '--reader-surface': colours.surface,
     '--reader-border': colours.border,
+    '--reader-navigation-hover': colours.navigationHover,
     '--reader-font-family': readingFontFamily(settings.font),
     '--reader-font-size-mobile': size.mobile,
     '--reader-font-size-desktop': size.desktop,

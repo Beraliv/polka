@@ -455,7 +455,7 @@ a {
   height: 3.5rem;
   border-radius: 999px;
   border: none;
-  color: #fff;
+  color: var(--text);
   font-size: 1.3rem;
   display: flex;
   align-items: center;
@@ -481,7 +481,7 @@ a {
 }
 
 .reader-nav-overlay:hover {
-  background: #303030;
+  background: var(--reader-navigation-hover);
 }
 
 .reader-nav-overlay--prev {

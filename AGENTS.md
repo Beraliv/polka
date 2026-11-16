@@ -5,6 +5,7 @@ Detailed specs live in [`specs/`](specs/) and are part of these guidelines. Read
 - [JavaScript / TypeScript](specs/javascript-typescript.md), when changing `*.js`, `*.jsx`, `*.ts` or `*.tsx` files
 - [Text selection](specs/text-selection.md), when changing the reader's text selection: `selection-manager.ts`, `create-selection-manager.ts`, `text-offsets.ts`, `copy-text.ts`, `SelectionOverlay.tsx`, `SelectionToolbar.tsx`, or the selection wiring in `ReaderPage.tsx`
 - [Explanation](specs/explanation.md), when changing the Explain action: `explain.ts` (server), `explanation-manager.ts`, `create-explanation-manager.ts`, `ExplanationSheet.tsx`, `ExplanationSettings.tsx`, `EXPLANATION_LANGUAGES` in `packages/shared`, or the explanation wiring in `ReaderPage.tsx`
+- [Reading settings](specs/reading-settings.md), when changing the Reading settings: `reading-settings.ts`, `ReadingSettings.tsx`, the `readingSettings` store key, or the reader styles driven by it (`.reader-content`, `.reader-paragraph`, bundled fonts)
 
 ## Philosophy
 

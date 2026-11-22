@@ -13,9 +13,9 @@ import {
 import { Dynamic } from 'solid-js/web';
 import { useNavigate, useParams } from '@solidjs/router';
 import { ChevronLeftIcon } from './ChevronLeftIcon.tsx';
-import { ChevronRightIcon } from './ChevronRightIcon.tsx';
 import { CloseIcon } from './CloseIcon.tsx';
 import { TocIcon } from './TocIcon.tsx';
+import { PageNavigationButtons } from './PageNavigationButtons.tsx';
 import { SelectionOverlay } from './SelectionOverlay.tsx';
 import { SelectionToolbar } from './SelectionToolbar.tsx';
 import { ExplanationSheet } from './ExplanationSheet.tsx';
@@ -24,6 +24,8 @@ import { saveProgress, resolveBestProgress, progressFraction } from '../lib/prog
 import { BookFilesDB } from '../lib/polka-db.ts';
 import { createSelectionManager } from '../lib/create-selection-manager.ts';
 import { createExplanationManager } from '../lib/create-explanation-manager.ts';
+import { createPageNavigation } from '../lib/create-page-navigation.ts';
+import { TAP_MOVE_TOLERANCE_PX } from '../lib/page-navigation.ts';
 import {
   parseBook,
   decodeImageAssets,
@@ -375,10 +377,6 @@ function buildPages({ pageEl, sections, imageAssets }: BuildPagesOptions): Built
   return { pages, sectionStartPageIndexes };
 }
 
-// A touch is treated as a tap only if the finger stayed within this distance,
-// mirroring the reader's page-turn tap detection.
-const TAP_MOVE_TOLERANCE_PX = 10;
-
 // Long enough to outlast a resize burst from a live window drag, short enough
 // that the reader doesn't feel stuck on the loading spinner.
 const RESIZE_DEBOUNCE_MS = 150;
@@ -413,7 +411,7 @@ function ReaderImage(props: ReaderImageProps) {
       return;
     }
     // Suppress the synthetic click that follows the tap and keep the tap away
-    // from the reader's edge-tap page navigation.
+    // from page navigation, which would otherwise read it as a margin tap.
     event.preventDefault();
     event.stopPropagation();
     props.onOpen();
@@ -527,10 +525,35 @@ export function ReaderPage() {
   let touchStartX = 0;
   let touchStartY = 0;
   let longPressTimer: ReturnType<typeof setTimeout> | undefined;
-  let longPressFired = false;
 
   const selectionManager = createSelectionManager();
   const explanationManager = createExplanationManager();
+
+  // Page-turn overlays sit over the page, so neither gestures nor keys may
+  // turn the page underneath them.
+  const isOverlayOpen = () =>
+    Boolean(activeNoteId() || fullscreenImageId() || tocOpen() || explanationManager.explanation());
+
+  // Reports whether a selection was open, so a gesture that only closed it
+  // doesn't also turn the page.
+  const dismissSelectionIfOpen = () => {
+    const wasOpen = selectionManager.activeSelection() !== null;
+    selectionManager.dismissSelection();
+    return wasOpen;
+  };
+
+  const pageNavigation = createPageNavigation({
+    onPreviousPage: () => prevPage(),
+    onNextPage: () => nextPage(),
+    isBlocked: isOverlayOpen,
+    dismissSelection: dismissSelectionIfOpen,
+    getReadingArea: () => contentEl,
+  });
+
+  function handleContentPointerDown(event: PointerEvent) {
+    pageNavigation.pressStart(event);
+    selectionManager.selectByPointerDrag(event);
+  }
 
   function explainSelection() {
     const passage = selectionManager.takeSelectedText();
@@ -748,16 +771,9 @@ export function ReaderPage() {
 
     void init();
 
-    // Page-turn keys do nothing while something sits over the page, so a
-    // stray key press can't change the page underneath it.
-    const isPageTurnBlocked = () =>
-      Boolean(
-        activeNoteId() ||
-        fullscreenImageId() ||
-        tocOpen() ||
-        explanationManager.explanation() ||
-        selectionManager.activeSelection(),
-      );
+    // Page-turn keys also wait for an open selection, so a stray key press
+    // can't close it by turning the page.
+    const isPageTurnBlocked = () => isOverlayOpen() || Boolean(selectionManager.activeSelection());
 
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
@@ -848,7 +864,6 @@ export function ReaderPage() {
       touchStartX = touch.clientX;
       touchStartY = touch.clientY;
     }
-    longPressFired = false;
     clearTimeout(longPressTimer);
     if (!touch || selectionManager.activeSelection()) {
       return;
@@ -856,7 +871,8 @@ export function ReaderPage() {
     const clientX = touch.clientX;
     const clientY = touch.clientY;
     longPressTimer = setTimeout(() => {
-      longPressFired = true;
+      // The finger's release ends a selection, not a tap, so it must not turn the page.
+      pageNavigation.abandonPress();
       selectionManager.selectWordAtPoint(clientX, clientY);
     }, LONG_PRESS_MS);
   }
@@ -874,36 +890,8 @@ export function ReaderPage() {
     }
   }
 
-  function handleContentTouchEnd(event: TouchEvent) {
+  function handleContentTouchEnd() {
     clearTimeout(longPressTimer);
-    if (longPressFired) {
-      // Selection just started via long-press — this touchend is its
-      // release, not a separate tap, so it must not also page-turn.
-      longPressFired = false;
-      return;
-    }
-    if (activeNoteId()) {
-      return;
-    }
-    const touch = event.changedTouches[0];
-    if (!touch) {
-      return;
-    }
-    if (Math.abs(touch.clientX - touchStartX) > 10 || Math.abs(touch.clientY - touchStartY) > 10) {
-      return;
-    }
-    if (selectionManager.activeSelection()) {
-      // A tap elsewhere while a selection/toolbar is open just dismisses it.
-      selectionManager.dismissSelection();
-      return;
-    }
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const zone = 2 * parseFloat(getComputedStyle(document.documentElement).fontSize);
-    if (touch.clientX < rect.left + zone) {
-      prevPage();
-    } else if (touch.clientX > rect.right - zone) {
-      nextPage();
-    }
   }
 
   const currentPage = () => localPages()[pageIdx()] ?? [];
@@ -952,27 +940,15 @@ export function ReaderPage() {
         onTouchStart={handleContentTouchStart}
         onTouchMove={handleContentTouchMove}
         onTouchEnd={handleContentTouchEnd}
-        onPointerDown={selectionManager.selectByPointerDrag}
+        onPointerDown={handleContentPointerDown}
         onDblClick={selectionManager.selectWordOnDoubleClick}
       >
-        <button
-          class="reader-nav-overlay reader-nav-overlay--prev"
-          onClick={prevPage}
-          disabled={pageIdx() === 0}
-          title={i18n('reader.previousPage')}
-          aria-label={i18n('reader.previousPage')}
-        >
-          <ChevronLeftIcon />
-        </button>
-        <button
-          class="reader-nav-overlay reader-nav-overlay--next"
-          onClick={nextPage}
-          disabled={lastVisiblePageNumber() >= total()}
-          title={i18n('reader.nextPage')}
-          aria-label={i18n('reader.nextPage')}
-        >
-          <ChevronRightIcon />
-        </button>
+        <PageNavigationButtons
+          canGoPrevious={pageIdx() > 0}
+          canGoNext={lastVisiblePageNumber() < total()}
+          onPrevious={prevPage}
+          onNext={nextPage}
+        />
         <Show when={!ready()}>
           <div class="reader-loading">
             <span class="spinner" />

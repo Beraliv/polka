@@ -97,9 +97,31 @@ Then in the UI open **Apps → Installed → polka → Edit** (on the Applicatio
 
 ## Updating
 
-New images are published to Docker Hub automatically by CI whenever an app's version is bumped on `main`. The config uses the `:latest` tag with `pull_policy: always`, so restarting the app pulls the newer `:latest` images instead of reusing the copies cached on the NAS. Check the new version in Polka's **Settings (⚙)** footer.
+New images are published to Docker Hub automatically by CI whenever an app's version is bumped on `main`. The config uses the `:latest` tag with `pull_policy: always`, so a container created from it pulls the newest `:latest` image instead of reusing the copy cached on the NAS.
 
-The Update dialog always shows **1.0.0 / custom** with no versions to pick — that is expected for YAML custom apps, which have no catalog behind them, and it does not reflect Polka's real version. To see which version is actually running, open Polka's **Settings (⚙)** page — the footer shows the client and server versions — or run `curl http://<nas-ip>:8080/api/version`.
+### How TrueNAS learns about a new image
+
+Apps installed from YAML have no catalog, so TrueNAS detects updates by comparing each image's digest on the NAS with the digest Docker Hub currently serves for the same tag. This needs:
+
+- **TrueNAS SCALE 25.10.0 or later.** Earlier versions never show updates for YAML custom apps (the fix is in the 25.10 line and not backported to 25.04 or 24.10).
+- **Image updates enabled** under Docker's settings. This is on by default.
+
+TrueNAS runs the check when Docker starts and then every 24 hours, so a new image can take up to a day to appear as **Update available** on **Apps → Installed**. Updating from there pulls the new image and recreates the containers.
+
+To check the state from the NAS shell (read-only):
+
+```bash
+midclt call docker.config | jq .enable_image_updates
+midclt call app.query | jq '.[] | select(.name=="polka") | {image_updates_available, upgrade_available}'
+```
+
+`image_updates_available` becomes `true` once the check has found a newer image, and `upgrade_available` follows from it.
+
+### Getting the new version now
+
+Until TrueNAS shows the update, the NAS keeps running the image it already has. Any action that recreates the containers pulls the new `:latest`: restarting the app, or **Edit → Save**. Both stop the running containers briefly.
+
+To see which version is actually running, open Polka's **Settings (⚙)** page: the footer shows the client and server versions. The Update dialog always shows **1.0.0 / custom** for YAML apps, because they have no catalog behind them, so it does not reflect Polka's version. You can also run `curl http://<nas-ip>:8080/api/version` for the server version.
 
 ## Debugging
 

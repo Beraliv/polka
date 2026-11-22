@@ -19,7 +19,7 @@ A mobile-first e-book reader for EPUB and FB2 files, designed to run on TrueNAS.
 - **Browse your NAS** via SMB and open books remotely
 - **Books persist across reloads** — stored in IndexedDB, no re-download needed
 - **Progress sync** — saved to IndexedDB and optionally synced to the server
-- **Mobile-first** — swipe left/right to turn pages; keyboard arrows and spacebar also work
+- **Mobile-first** — swipe left for the next page and right for the previous one, or tap or click the page's left or right edge; keyboard arrows and spacebar also work
 - **Reader navigation** — jump to any chapter from the table of contents; each book card shows your page and percent progress
 - **Select text** — long-press a word on touch screens, or drag across text or double-click a word with a mouse; drag the handles to adjust it, even across paragraphs, then copy it, search the web for it, or ask Claude to explain it
 - **Explain a passage** — Claude explains the selected text using the book's title and author, streamed into a sheet at the bottom of the page that a swipe down closes. Explanations come in the language chosen in Settings (English by default; also Spanish, French, Portuguese, Russian, German, Italian, Polish, Ukrainian and Dutch), whatever language the book is in. Requires an `ANTHROPIC_API_KEY` on the server

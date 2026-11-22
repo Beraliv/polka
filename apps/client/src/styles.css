@@ -395,6 +395,9 @@ a {
 
 .reader-content {
   flex: 1;
+  /* Vertical pans stay with the browser; horizontal drags are swipes that
+     turn the page, so the browser must not claim them. */
+  touch-action: pan-y;
   overflow: hidden;
   padding: 0.75rem 2rem var(--reader-page-vertical-gap);
   font-family: Georgia, 'Times New Roman', serif;

@@ -6,7 +6,7 @@ import {
   marginTurn,
   swipeTurn,
 } from './page-navigation.ts';
-import type { PointerRelease, ViewportRect } from './page-navigation.ts';
+import type { PointerPress, PointerRelease, ViewportRect } from './page-navigation.ts';
 
 const AREA_RECT: ViewportRect = { left: 0, top: 50, right: 800, bottom: 600 };
 const MARGIN_PX = MARGIN_ZONE_REM * 16;
@@ -42,10 +42,7 @@ function release(overrides: Partial<PointerRelease>): PointerRelease {
 }
 
 // Presses on the middle of the page unless a test moves them.
-function press(
-  navigation: PageNavigation,
-  overrides: { x?: number; y?: number; pointerType?: string; pointerId?: number } = {},
-) {
+function press(navigation: PageNavigation, overrides: Partial<PointerPress> = {}) {
   navigation.pressStart({
     pointerId: overrides.pointerId ?? 1,
     pointerType: overrides.pointerType ?? 'touch',

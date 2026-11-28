@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import Anthropic from '@anthropic-ai/sdk';
 import { PassThrough } from 'stream';
 import {
+  AI_PROVIDERS,
   SUPPORTED_CHAT_CONTENT_BLOCK_TYPES,
   type ChatContentBlock,
   type ChatContentBlockType,
@@ -11,6 +12,9 @@ import {
   type ChatStreamEvent,
 } from '@polka/shared';
 import { anthropicClient } from '../lib/anthropic-client.ts';
+import { geminiClient } from '../lib/gemini-client.ts';
+import { streamGeminiReply } from '../lib/gemini-reply.ts';
+import { providerUnavailableError, resolveAiProvider } from '../lib/ai-provider.ts';
 
 const SYSTEM_PROMPT =
   'You are a helpful assistant built into Polka, a personal e-book reader app. Be concise and friendly. ' +
@@ -35,6 +39,7 @@ const chatRequestBodySchema = {
   type: 'object',
   required: ['messages'],
   properties: {
+    provider: { enum: AI_PROVIDERS.map((provider) => provider.code) },
     messages: {
       type: 'array',
       minItems: 1,
@@ -80,13 +85,20 @@ function isEmptyBlock(block: ChatContentBlock): boolean {
 }
 
 // Empty blocks and messages (a refusal before any text, or a reply the client
-// cut short) are dropped because the API rejects empty text blocks and
+// cut short) are dropped because the APIs reject empty text blocks and
 // messages with no content.
-export function toAnthropicMessages(messages: ChatMessage[]): Anthropic.MessageParam[] {
+export function withoutEmptyMessages(messages: ChatMessage[]): ChatMessage[] {
   return messages.flatMap(({ role, content }) => {
-    const blocks = content.filter((block) => !isEmptyBlock(block)).map(toAnthropicBlock);
+    const blocks = content.filter((block) => !isEmptyBlock(block));
     return blocks.length > 0 ? [{ role, content: blocks }] : [];
   });
+}
+
+export function toAnthropicMessages(messages: ChatMessage[]): Anthropic.MessageParam[] {
+  return withoutEmptyMessages(messages).map(({ role, content }) => ({
+    role,
+    content: content.map(toAnthropicBlock),
+  }));
 }
 
 // Also takes the beta stop reasons, for routes on the beta Messages API (e.g.
@@ -108,25 +120,55 @@ export function toChatStopReason(
 }
 
 /**
- * Stops Claude when the client goes away. The client cancels a reply by
- * dropping the connection (leaving the chat, closing the explanation sheet);
- * without this, Claude keeps generating, and billing, until the reply ends.
- * Listens on the response, not the request: a request emits `close` as soon
- * as its body has been read. The response also closes after a normal finish,
- * which `writableFinished` tells apart.
+ * Stops the AI request when the client goes away. The client cancels a reply
+ * by dropping the connection (leaving the chat, closing the explanation
+ * sheet); without this, the model keeps generating, and billing, until the
+ * reply ends. Listens on the response, not the request: a request emits
+ * `close` as soon as its body has been read. The response also closes after a
+ * normal finish, which `writableFinished` tells apart.
  */
 export function abortOnDisconnect({
   reply,
-  stream,
+  controller,
 }: {
   reply: FastifyReply;
-  stream: { abort: () => void };
+  controller: AbortController;
 }) {
   reply.raw.once('close', () => {
     if (!reply.raw.writableFinished) {
-      stream.abort();
+      controller.abort();
     }
   });
+}
+
+// The subset of Anthropic's streaming message object that the routes read.
+type ClaudeMessageStream = AsyncIterable<
+  Anthropic.MessageStreamEvent | Anthropic.Beta.BetaRawMessageStreamEvent
+> & {
+  finalMessage(): Promise<{
+    stop_reason: Anthropic.StopReason | Anthropic.Beta.BetaStopReason | null;
+  }>;
+};
+
+/**
+ * Turns a Claude message stream into the chat stream events. Only text blocks
+ * are forwarded. The reply also holds thinking blocks (this model thinks by
+ * default), which are Claude's internal reasoning and not part of the answer.
+ * No tools are offered, so no other block types can appear.
+ */
+export async function* streamClaudeReply(
+  stream: ClaudeMessageStream,
+): AsyncGenerator<ChatStreamEvent> {
+  for await (const event of stream) {
+    if (event.type === 'content_block_start' && event.content_block.type === 'text') {
+      yield { type: 'block_start', block: { type: 'text', text: event.content_block.text } };
+    } else if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+      yield { type: 'text_delta', text: event.delta.text };
+    }
+  }
+
+  const finalMessage = await stream.finalMessage();
+  yield { type: 'message_end', stopReason: toChatStopReason(finalMessage.stop_reason) };
 }
 
 export function writeStreamEvent(body: PassThrough, event: ChatStreamEvent) {
@@ -138,11 +180,13 @@ export async function chatRoutes(app: FastifyInstance) {
     '/',
     { schema: { body: chatRequestBodySchema } },
     async (req, reply) => {
-      if (!anthropicClient) {
-        return reply.code(500).send({ error: 'ANTHROPIC_API_KEY is not configured on the server' });
+      const provider = resolveAiProvider(req.body.provider);
+      const unavailableError = providerUnavailableError(provider);
+      if (unavailableError) {
+        return reply.code(500).send({ error: unavailableError });
       }
 
-      const messages = toAnthropicMessages(req.body.messages);
+      const messages = withoutEmptyMessages(req.body.messages);
       // Claude Opus 5 doesn't accept a conversation that ends on an assistant
       // turn, so reject it here with a clear error instead of mid-stream.
       if (messages.at(-1)?.role !== 'user') {
@@ -159,38 +203,36 @@ export async function chatRoutes(app: FastifyInstance) {
         .header('Cache-Control', 'no-cache')
         .send(body);
 
+      const controller = new AbortController();
+      abortOnDisconnect({ reply, controller });
+
       try {
-        const stream = anthropicClient.messages.stream({
-          model: 'claude-opus-5',
-          max_tokens: 4096,
-          system: SYSTEM_PROMPT,
-          messages,
-        });
-        abortOnDisconnect({ reply, stream });
-
-        for await (const event of stream) {
-          // Only text blocks are forwarded. The reply also holds thinking blocks
-          // (this model thinks by default), which are Claude's internal reasoning
-          // and not part of the answer. No tools are offered, so no other block
-          // types can appear.
-          if (event.type === 'content_block_start' && event.content_block.type === 'text') {
-            writeStreamEvent(body, {
-              type: 'block_start',
-              block: { type: 'text', text: event.content_block.text },
-            });
-          } else if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-            writeStreamEvent(body, { type: 'text_delta', text: event.delta.text });
-          }
+        const events =
+          provider === 'gemini'
+            ? streamGeminiReply({
+                client: geminiClient!,
+                system: SYSTEM_PROMPT,
+                messages,
+                maxOutputTokens: 4096,
+                signal: controller.signal,
+              })
+            : streamClaudeReply(
+                anthropicClient!.messages.stream(
+                  {
+                    model: 'claude-opus-5',
+                    max_tokens: 4096,
+                    system: SYSTEM_PROMPT,
+                    messages: toAnthropicMessages(messages),
+                  },
+                  { signal: controller.signal },
+                ),
+              );
+        for await (const event of events) {
+          writeStreamEvent(body, event);
         }
-
-        const finalMessage = await stream.finalMessage();
-        writeStreamEvent(body, {
-          type: 'message_end',
-          stopReason: toChatStopReason(finalMessage.stop_reason),
-        });
       } catch (err) {
         // Aborted because the client left; there's no one to tell.
-        if (err instanceof Anthropic.APIUserAbortError) {
+        if (controller.signal.aborted) {
           return;
         }
         writeStreamEvent(body, {

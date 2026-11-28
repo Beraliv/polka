@@ -1,9 +1,10 @@
-import type { ChatMessage, ChatRequest, ChatStreamEvent } from '@polka/shared';
+import type { AiProviderCode, ChatMessage, ChatRequest, ChatStreamEvent } from '@polka/shared';
 import { apiUrl } from './apiUrl.ts';
 import { readChatEventStream } from './readChatEventStream.ts';
 
 interface SendChatMessageOptions {
   messages: ChatMessage[];
+  provider: AiProviderCode;
   onEvent: (event: ChatStreamEvent) => void;
   signal?: AbortSignal;
 }
@@ -12,10 +13,11 @@ interface SendChatMessageOptions {
 // render token-by-token instead of waiting for the full response.
 export async function sendChatMessage({
   messages,
+  provider,
   onEvent,
   signal,
 }: SendChatMessageOptions): Promise<void> {
-  const request: ChatRequest = { messages };
+  const request: ChatRequest = { messages, provider };
   const response = await fetch(apiUrl('/api/chat'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

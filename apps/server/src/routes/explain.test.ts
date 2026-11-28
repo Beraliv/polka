@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import Fastify from 'fastify';
-import { buildExplainPrompt, explainRoutes } from './explain.ts';
+import { explainRoutes } from './explain.ts';
+import { buildExplainPrompt } from '../lib/explain-settings.ts';
 
 describe('buildExplainPrompt', () => {
   it('names the book, author and language, and wraps the passage', () => {

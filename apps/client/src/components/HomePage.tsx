@@ -4,6 +4,7 @@ import { LibraryIcon } from './LibraryIcon.tsx';
 import { SettingsIcon } from './SettingsIcon.tsx';
 import { ChatIcon } from './ChatIcon.tsx';
 import { store, BookStore } from '../store/books.ts';
+import { isAnyAiProviderAvailable } from '../lib/resolve-effective-ai-provider.ts';
 import { parseBook, computeBookId, createCoverThumbnail } from '../lib/book';
 import { downloadSMBFile } from '../lib/api';
 import { allProgress, loadProgress, resolveBestProgress, saveProgress } from '../lib/progress.ts';
@@ -193,14 +194,17 @@ export function HomePage() {
       <div class="page-header">
         <h1 class="page-title">{i18n('home.appTitle')}</h1>
         <div class="page-header-actions">
-          <A
-            href="/chat"
-            class="icon-btn"
-            title={i18n('home.chatTooltip')}
-            aria-label={i18n('home.chatTooltip')}
-          >
-            <ChatIcon />
-          </A>
+          {/* Shown only when the server has a key for at least one provider. */}
+          <Show when={isAnyAiProviderAvailable(store.availableAiProviders)}>
+            <A
+              href="/chat"
+              class="icon-btn"
+              title={i18n('home.chatTooltip')}
+              aria-label={i18n('home.chatTooltip')}
+            >
+              <ChatIcon />
+            </A>
+          </Show>
           <A
             href="/settings"
             class="icon-btn"

@@ -39,4 +39,5 @@ initProgress().then(() => {
     root,
   );
   void BookStore.loadSMBStatus();
+  void BookStore.loadAiProviders();
 });

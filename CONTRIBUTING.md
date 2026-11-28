@@ -58,6 +58,10 @@ pnpm --filter @polka/client exec tsc --noEmit
 pnpm --filter @polka/server exec tsc --noEmit
 ```
 
+## Model experiments
+
+To compare the Explain models and update their decision records (`docs/claude-models.md`, `docs/gemini-models.md`), run `pnpm model-experiment claude` or `pnpm model-experiment gemini`. It needs the API keys in `.env` and makes about 40 calls per run. See [Model experiment](specs/model-experiment.md).
+
 ## Building
 
 ```bash

@@ -1,7 +1,9 @@
 import type { Component } from 'solid-js';
 import type { KeyWithoutPlaceholders } from '../i18n';
+import { store } from '../store/books.ts';
 import { NasConfigurationSettings } from '../components/settings/NasConfigurationSettings.tsx';
 import { DeveloperSettings } from '../components/settings/DeveloperSettings.tsx';
+import { AiProviderSettings } from '../components/settings/AiProviderSettings.tsx';
 import { ExplanationSettings } from '../components/settings/ExplanationSettings.tsx';
 
 interface SettingsNodeBase {
@@ -20,6 +22,9 @@ export interface SettingsGroupNode extends SettingsNodeBase {
 export interface SettingsPageNode extends SettingsNodeBase {
   type: 'page';
   component: Component;
+  // Whether the page is offered: true, false, or null while still unknown.
+  // Absent means always offered.
+  isAvailable?: () => boolean | null;
 }
 
 export type SettingsNode = SettingsGroupNode | SettingsPageNode;
@@ -37,9 +42,19 @@ export const settingsRoot: SettingsGroupNode = {
     },
     {
       type: 'page',
+      id: 'ai-provider',
+      labelKey: 'settings.aiProviderLabel',
+      component: AiProviderSettings,
+      // A choice needs at least two providers; with fewer there is nothing to choose.
+      isAvailable: aiProviderCountAvailability(2),
+    },
+    {
+      type: 'page',
       id: 'explanation',
       labelKey: 'settings.explanationLabel',
       component: ExplanationSettings,
+      // The language only matters to Explain, which needs an AI provider.
+      isAvailable: aiProviderCountAvailability(1),
     },
     {
       type: 'page',
@@ -49,6 +64,26 @@ export const settingsRoot: SettingsGroupNode = {
     },
   ],
 };
+
+/**
+ * Availability of a page that needs at least `minimumCount` AI providers.
+ * Null while the server's list is unknown, so the page is not offered yet.
+ */
+function aiProviderCountAvailability(minimumCount: number): () => boolean | null {
+  return () => {
+    const providers = store.availableAiProviders;
+    return providers === null ? null : providers.length >= minimumCount;
+  };
+}
+
+function availabilityOf(node: SettingsNode): boolean | null {
+  return node.type === 'page' && node.isAvailable ? node.isAvailable() : true;
+}
+
+/** Listed in the menu only when known to be available, so an unknown page is not offered. */
+export function isSettingsNodeListed(node: SettingsNode): boolean {
+  return availabilityOf(node) === true;
+}
 
 /**
  * Resolves URL path segments (e.g. ['developer']) against the tree, from the
@@ -63,7 +98,9 @@ export function resolveSettingsPath(segments: string[]): SettingsNode[] | null {
       return null;
     }
     const next: SettingsNode | undefined = current.children.find((child) => child.id === segment);
-    if (!next) {
+    // Only a page known to be unavailable is refused. An unknown one resolves,
+    // so a bookmark still works while the startup fetch is in flight.
+    if (!next || availabilityOf(next) === false) {
       return null;
     }
     chain.push(next);

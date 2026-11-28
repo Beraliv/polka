@@ -3,6 +3,7 @@ packages:
   - 'packages/*'
 allowBuilds:
   esbuild: true
+  protobufjs: false
 minimumReleaseAgeExclude:
   - '@anthropic-ai/sdk@1.8.0'
 patchedDependencies:

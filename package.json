@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "build": "pnpm --filter './packages/*' build && pnpm --filter './apps/*' build",
-    "test": "pnpm --recursive run test",
+    "test": "pnpm --recursive run test && pnpm --filter @polka/server exec vitest run --dir ../../scripts/model-experiment",
     "lint": "pnpm --recursive run lint",
     "format": "pnpm --recursive run format",
-    "screenshots": "node scripts/take-screenshots.ts"
+    "screenshots": "node scripts/take-screenshots.ts",
+    "model-experiment": "node --env-file-if-exists=.env scripts/model-experiment/index.ts"
   },
   "engines": {
     "node": ">=24",

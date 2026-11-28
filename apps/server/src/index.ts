@@ -11,6 +11,7 @@ import { progressRoutes } from './routes/progress.ts';
 import { versionRoutes } from './routes/version.ts';
 import { chatRoutes } from './routes/chat.ts';
 import { explainRoutes } from './routes/explain.ts';
+import { aiProvidersRoutes } from './routes/ai-providers.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -56,6 +57,7 @@ await app.register(progressRoutes, { prefix: '/api/progress' });
 await app.register(versionRoutes, { prefix: '/api/version' });
 await app.register(chatRoutes, { prefix: '/api/chat' });
 await app.register(explainRoutes, { prefix: '/api/explain' });
+await app.register(aiProvidersRoutes, { prefix: '/api/ai-providers' });
 
 // SPA fallback — serve index.html for unknown routes in production
 app.setNotFoundHandler(async (_req, reply) => {

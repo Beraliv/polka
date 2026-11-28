@@ -5,10 +5,27 @@ import { ChevronLeftIcon } from './ChevronLeftIcon.tsx';
 import { ChatMessageContent } from './ChatMessageContent.tsx';
 import { sendChatMessage } from '../lib/api';
 import { applyChatStreamEvent } from '../lib/chat/applyChatStreamEvent.ts';
+import { store } from '../store/books.ts';
+import {
+  isAnyAiProviderAvailable,
+  resolveEffectiveAiProvider,
+} from '../lib/resolve-effective-ai-provider.ts';
 import { i18n } from '../i18n';
 
 export function ChatPage() {
   const navigate = useNavigate();
+
+  // A direct visit with no AI provider configured has nothing to show, and the
+  // Home icon is hidden in the same case. While the list is unknown the page
+  // stays open, so a bookmark survives the startup fetch.
+  createEffect(() => {
+    if (
+      store.availableAiProviders !== null &&
+      !isAnyAiProviderAvailable(store.availableAiProviders)
+    ) {
+      navigate('/', { replace: true });
+    }
+  });
 
   const [messages, setMessages] = createSignal<ChatMessage[]>([]);
   const [draft, setDraft] = createSignal('');
@@ -62,7 +79,14 @@ export function ChatPage() {
     setMessages([...history, { role: 'assistant', content: [] }]);
     setSending(true);
     try {
-      await sendChatMessage({ messages: history, onEvent: handleStreamEvent });
+      await sendChatMessage({
+        messages: history,
+        provider: resolveEffectiveAiProvider({
+          storedProvider: store.aiProvider,
+          availableProviders: store.availableAiProviders,
+        }),
+        onEvent: handleStreamEvent,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setMessages(history);

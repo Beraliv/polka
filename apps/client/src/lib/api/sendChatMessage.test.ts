@@ -42,17 +42,26 @@ describe('sendChatMessage', () => {
     mockStreamResponse([stream.slice(0, 20), stream.slice(20)]);
     const onEvent = vi.fn();
 
-    await sendChatMessage({ messages: userMessages, onEvent });
+    await sendChatMessage({ messages: userMessages, provider: 'claude', onEvent });
 
     expect(onEvent.mock.calls.map(([event]) => event)).toEqual(events);
+  });
+
+  it('sends the chosen AI provider with the messages', async () => {
+    mockStreamResponse([toServerSentEvents([{ type: 'message_end', stopReason: 'end_turn' }])]);
+
+    await sendChatMessage({ messages: userMessages, provider: 'gemini', onEvent: vi.fn() });
+
+    const [, init] = vi.mocked(fetch).mock.calls[0];
+    expect(JSON.parse(String(init?.body))).toEqual({ messages: userMessages, provider: 'gemini' });
   });
 
   it('throws the message of an error event', async () => {
     mockStreamResponse([toServerSentEvents([{ type: 'error', error: 'Overloaded' }])]);
 
-    await expect(sendChatMessage({ messages: userMessages, onEvent: vi.fn() })).rejects.toThrow(
-      'Overloaded',
-    );
+    await expect(
+      sendChatMessage({ messages: userMessages, provider: 'claude', onEvent: vi.fn() }),
+    ).rejects.toThrow('Overloaded');
   });
 
   it('throws the error a rejected request returns', async () => {
@@ -61,8 +70,8 @@ describe('sendChatMessage', () => {
       vi.fn().mockResolvedValue(Response.json({ error: 'Bad request' }, { status: 400 })),
     );
 
-    await expect(sendChatMessage({ messages: userMessages, onEvent: vi.fn() })).rejects.toThrow(
-      'Bad request',
-    );
+    await expect(
+      sendChatMessage({ messages: userMessages, provider: 'claude', onEvent: vi.fn() }),
+    ).rejects.toThrow('Bad request');
   });
 });

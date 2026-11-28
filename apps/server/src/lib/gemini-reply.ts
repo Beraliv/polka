@@ -1,4 +1,4 @@
-import { FinishReason, type Content, type GoogleGenAI } from '@google/genai';
+import { FinishReason, ThinkingLevel, type Content, type GoogleGenAI } from '@google/genai';
 import type { ChatMessage, ChatStopReason, ChatStreamEvent } from '@polka/shared';
 
 // The newest Gemini model at the strongest tier, matching how Claude is used
@@ -33,10 +33,26 @@ function toGeminiContents(messages: ChatMessage[]): Content[] {
   }));
 }
 
+// The experiment names thinking levels as strings in its candidate list; this
+// is the one place they become the SDK's enum.
+export function toGeminiThinkingLevel(level: 'LOW' | 'MEDIUM' | 'HIGH'): ThinkingLevel {
+  return ThinkingLevel[level];
+}
+
+export type GeminiUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  thinkingTokens: number;
+};
+
 /**
  * Streams a Gemini reply as the same events Claude's reply produces, so the
  * client reads both the same way. Thinking parts are internal reasoning and
  * are skipped, as with Claude's thinking blocks.
+ *
+ * `model` and `thinkingLevel` default to the chat setup; the Explain route and
+ * the model experiment pass their own. `onUsage` receives the token counts of
+ * the finished reply, for the experiment's cost and latency figures.
  */
 export async function* streamGeminiReply({
   client,
@@ -44,22 +60,41 @@ export async function* streamGeminiReply({
   messages,
   maxOutputTokens,
   signal,
+  model = GEMINI_MODEL,
+  thinkingLevel,
+  onUsage,
 }: {
   client: GoogleGenAI;
   system: string;
   messages: ChatMessage[];
   maxOutputTokens: number;
   signal: AbortSignal;
+  model?: string;
+  thinkingLevel?: ThinkingLevel;
+  onUsage?: (usage: GeminiUsage) => void;
 }): AsyncGenerator<ChatStreamEvent> {
   const chunks = await client.models.generateContentStream({
-    model: GEMINI_MODEL,
+    model,
     contents: toGeminiContents(messages),
-    config: { systemInstruction: system, maxOutputTokens, abortSignal: signal },
+    config: {
+      systemInstruction: system,
+      maxOutputTokens,
+      abortSignal: signal,
+      // Left out entirely when unset, so the chat request is unchanged.
+      ...(thinkingLevel ? { thinkingConfig: { thinkingLevel } } : {}),
+    },
   });
 
   let hasTextBlock = false;
   let stopReason: ChatStopReason = 'end_turn';
+  // Gemini reports token counts on the chunks; the last report is the total.
+  let latestUsageMetadata:
+    | { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number }
+    | undefined;
   for await (const chunk of chunks) {
+    if (chunk.usageMetadata) {
+      latestUsageMetadata = chunk.usageMetadata;
+    }
     // A blocked prompt comes back with no candidate at all, so the refusal
     // is read from the feedback rather than the finish reason.
     if (chunk.promptFeedback?.blockReason) {
@@ -83,5 +118,10 @@ export async function* streamGeminiReply({
     }
   }
 
+  onUsage?.({
+    inputTokens: latestUsageMetadata?.promptTokenCount ?? 0,
+    outputTokens: latestUsageMetadata?.candidatesTokenCount ?? 0,
+    thinkingTokens: latestUsageMetadata?.thoughtsTokenCount ?? 0,
+  });
   yield { type: 'message_end', stopReason };
 }

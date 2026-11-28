@@ -7,6 +7,7 @@ Detailed specs live in [`specs/`](specs/) and are part of these guidelines. Read
 - [Explanation](specs/explanation.md), when changing the Explain action: `explain.ts` (server), `explanation-manager.ts`, `create-explanation-manager.ts`, `ExplanationSheet.tsx`, `ExplanationSettings.tsx`, `EXPLANATION_LANGUAGES` in `packages/shared`, or the explanation wiring in `ReaderPage.tsx`
 - [Chat](specs/chat.md), when changing the Chat page or when the Chat icon and the AI provider setting are offered: `HomePage.tsx`'s Chat icon, `ChatPage.tsx`, `ai-provider.ts`, `ai-providers` routes, `settings/tree.ts`, `AiProviderSettings.tsx`, or the availability state in `store/books.ts`
 - [Navigation](specs/navigation.md), when changing page turning: `page-navigation.ts`, `create-page-navigation.ts`, `PageNavigationButtons.tsx`, or the navigation wiring in `ReaderPage.tsx` (keys, swipes, margin taps, prev/next buttons)
+- [Model experiment](specs/model-experiment.md), when changing `scripts/model-experiment/`, `explain-settings.ts`, or the decision records `docs/claude-models.md` and `docs/gemini-models.md`
 
 ## Philosophy
 

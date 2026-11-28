@@ -69,6 +69,9 @@ async function answerApiRequest(route: Route, serverVersion: string) {
   if (path === '/api/version') {
     return route.fulfill({ json: { version: serverVersion } });
   }
+  if (path === '/api/ai-providers') {
+    return route.fulfill({ json: { providers: ['claude', 'gemini'] } });
+  }
   if (path === '/api/smb/config' && method === 'GET') {
     return route.fulfill({ json: fakeNasConfig });
   }

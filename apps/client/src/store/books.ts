@@ -13,6 +13,7 @@ import {
 import type { SectionItem, TocEntry, Note } from '../lib/book';
 import { BookFilesDB, ProgressDB } from '../lib/polka-db.ts';
 import {
+  fetchAiProviders,
   fetchSMBConfig,
   saveSMBConfig as saveSMBConfigApi,
   deleteSMBConfig as deleteSMBConfigApi,
@@ -68,6 +69,9 @@ const [store, setStore] = createStore({
   serverUrl: load<string>(SERVER_URL_KEY, ''),
   explanationLanguage: loadExplanationLanguage(),
   aiProvider: loadAiProvider(),
+  // null until the server has answered. The Chat icon and the AI provider
+  // setting depend on it. Never persisted, like smbStatus.
+  availableAiProviders: null as AiProviderCode[] | null,
   sections: {} as Record<string, SectionItem[]>,
   toc: {} as Record<string, TocEntry[]>,
   notes: {} as Record<string, Record<string, Note>>,
@@ -206,6 +210,15 @@ export class BookStore {
       console.error('[saveAiProvider] Failed to save AI provider to local storage:', error);
     }
     setStore('aiProvider', provider);
+  }
+
+  static async loadAiProviders(): Promise<void> {
+    const providers = await fetchAiProviders();
+    if (providers === null) {
+      console.error('[loadAiProviders] Failed to load AI providers from server');
+      return;
+    }
+    setStore('availableAiProviders', providers);
   }
 
   static async loadSMBStatus(): Promise<void> {

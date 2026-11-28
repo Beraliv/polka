@@ -18,7 +18,7 @@ Native text selection is turned off on reader paragraphs (`user-select: none`, `
 | [`lib/text-offsets.ts`](../apps/client/src/lib/text-offsets.ts) | Positions in the text: hit-testing, ordering, `Range`s, selected text and its boxes |
 | [`lib/copy-text.ts`](../apps/client/src/lib/copy-text.ts) | Clipboard write, with a fallback for plain HTTP |
 | [`components/SelectionOverlay.tsx`](../apps/client/src/components/SelectionOverlay.tsx) | Selection boxes and handles |
-| [`components/SelectionToolbar.tsx`](../apps/client/src/components/SelectionToolbar.tsx) | Copy, Search in Web and Explain buttons |
+| [`components/SelectionToolbar.tsx`](../apps/client/src/components/SelectionToolbar.tsx) | Copy, Search in Web and Explain buttons (Explain only when an AI provider is available) |
 | [`components/ReaderPage.tsx`](../apps/client/src/components/ReaderPage.tsx) | Gesture wiring and dismissal |
 
 The split between the class and its adapter follows [JavaScript / TypeScript](javascript-typescript.md).
@@ -54,7 +54,7 @@ The toolbar sits centred above the selection, kept within the reading area horiz
 - **Copy** puts the selected text on the clipboard and closes the selection. Paragraphs are separated by a line break. The exception is a paragraph that pagination split across a page break: its two parts are joined with a space, as the one paragraph they are in the book.
 - **Search in Web** opens a Google search for the selected text in a new tab and closes the selection. Leading and trailing whitespace is trimmed, and nothing opens if no text is left.
 
-- **Explain** hands the selected text, trimmed, to the explanation sheet and closes the selection. See [Explanation](explanation.md).
+- **Explain** hands the selected text, trimmed, to the explanation sheet and closes the selection. The button is shown only when an AI provider is available. See [Explanation](explanation.md) and [Chat](chat.md).
 
 The search engine is a fixed default with no setting yet. Searching sends the selected text to Google, and Explain sends it to the Polka server and on to Claude; nothing is sent until the user presses a button.
 

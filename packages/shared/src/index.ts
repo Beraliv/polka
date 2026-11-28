@@ -101,6 +101,12 @@ export function isAiProviderCode(code: unknown): code is AiProviderCode {
   return AI_PROVIDERS.some((provider) => provider.code === code);
 }
 
+// `GET /api/ai-providers`: the providers whose API key the server has. Never
+// carries key values.
+export type AiProvidersResponse = {
+  providers: AiProviderCode[];
+};
+
 export type ChatRequest = {
   messages: ChatMessage[];
   // Optional so a client that predates the setting keeps getting Claude.

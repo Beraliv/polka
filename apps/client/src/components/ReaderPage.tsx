@@ -24,6 +24,10 @@ import { saveProgress, resolveBestProgress, progressFraction } from '../lib/prog
 import { BookFilesDB } from '../lib/polka-db.ts';
 import { createSelectionManager } from '../lib/create-selection-manager.ts';
 import { createExplanationManager } from '../lib/create-explanation-manager.ts';
+import {
+  isAnyAiProviderAvailable,
+  resolveEffectiveAiProvider,
+} from '../lib/resolve-effective-ai-provider.ts';
 import { createPageNavigation } from '../lib/create-page-navigation.ts';
 import { TAP_MOVE_TOLERANCE_PX } from '../lib/page-navigation.ts';
 import {
@@ -566,7 +570,10 @@ export function ReaderPage() {
       bookName: currentBook?.name ?? '',
       author: currentBook?.author,
       language: store.explanationLanguage,
-      provider: store.aiProvider,
+      provider: resolveEffectiveAiProvider({
+        storedProvider: store.aiProvider,
+        availableProviders: store.availableAiProviders,
+      }),
     });
   }
   // A selection points at a rendered paragraph element, which is gone once
@@ -999,6 +1006,7 @@ export function ReaderPage() {
                   onCopy={() => void selectionManager.copyActiveSelection()}
                   onSearchInWeb={selectionManager.searchActiveSelectionInWeb}
                   onExplain={explainSelection}
+                  canExplain={isAnyAiProviderAvailable(store.availableAiProviders)}
                 />
               </>
             );

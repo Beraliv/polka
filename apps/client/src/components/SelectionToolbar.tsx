@@ -1,3 +1,4 @@
+import { Show } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { CopyIcon } from './CopyIcon.tsx';
 import { ExplainIcon } from './ExplainIcon.tsx';
@@ -10,6 +11,8 @@ type SelectionToolbarProps = {
   onCopy: () => void;
   onSearchInWeb: () => void;
   onExplain: () => void;
+  // Explain needs an AI provider; without one the button is left out.
+  canExplain: boolean;
 };
 
 const TOOLBAR_GAP_PX = 8;
@@ -66,15 +69,17 @@ export function SelectionToolbar(props: SelectionToolbarProps) {
         >
           <GlobeIcon />
         </button>
-        <button
-          class="selection-toolbar-btn"
-          onClick={props.onExplain}
-          onTouchEnd={props.onExplain}
-          title={i18n('reader.explainTooltip')}
-          aria-label={i18n('reader.explainTooltip')}
-        >
-          <ExplainIcon />
-        </button>
+        <Show when={props.canExplain}>
+          <button
+            class="selection-toolbar-btn"
+            onClick={props.onExplain}
+            onTouchEnd={props.onExplain}
+            title={i18n('reader.explainTooltip')}
+            aria-label={i18n('reader.explainTooltip')}
+          >
+            <ExplainIcon />
+          </button>
+        </Show>
       </div>
     </Portal>
   );

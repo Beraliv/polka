@@ -31,7 +31,7 @@ A mobile-first e-book reader for EPUB and FB2 files, designed to run on TrueNAS.
 - **Installable on TrueNAS SCALE** via Docker Compose
 - **Developer settings** — a "Force Restart" option reloads the app right away, useful if it feels stuck after an update
 - **Chat with the AI** — a built-in chat page for translations, questions, or anything else, with plain-text replies streamed token-by-token; a short notice explains when a reply was cut off for length or the AI declined to answer
-- **Choose your AI** — Settings picks the AI service for Chat and Explain: Claude (the default) or Gemini. Each one needs its API key on the server: `ANTHROPIC_API_KEY` for Claude, `GEMINI_API_KEY` for Gemini
+- **Choose your AI** — Settings picks the AI service for Chat and Explain: Claude (the default) or Gemini. Each one needs its API key on the server: `ANTHROPIC_API_KEY` for Claude, `GEMINI_API_KEY` for Gemini. The Chat icon appears when at least one key is set, and the choice appears in Settings only when both are set.
 
 See [docs/features.md](docs/features.md) for a detailed FB2 vs EPUB support matrix.
 

@@ -566,6 +566,7 @@ export function ReaderPage() {
       bookName: currentBook?.name ?? '',
       author: currentBook?.author,
       language: store.explanationLanguage,
+      provider: store.aiProvider,
     });
   }
   // A selection points at a rendered paragraph element, which is gone once

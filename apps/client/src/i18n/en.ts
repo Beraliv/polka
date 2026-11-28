@@ -14,7 +14,7 @@ export const en = {
     addFromDeviceButton: 'Add from device',
     addFromNasButton: 'Add from NAS',
     appTitle: 'Polka',
-    chatTooltip: 'Chat with Claude',
+    chatTooltip: 'Chat with the AI',
     emptyStateText: 'No books yet — tap "$addFromDevice" or "$addFromNas" to add one',
     finishedShelfHeading: 'Finished',
     missingSmbConfigError:
@@ -28,10 +28,10 @@ export const en = {
   chat: {
     backTooltip: 'Back',
     emptyStateText:
-      'Ask Claude anything — translations, book recommendations, or general questions.',
-    placeholder: 'Message Claude…',
+      'Ask the AI anything — translations, book recommendations, or general questions.',
+    placeholder: 'Message the AI…',
     replyCutOffNotice: 'The reply was cut off because it got too long.',
-    replyDeclinedNotice: 'Claude declined to answer this message.',
+    replyDeclinedNotice: 'The AI declined to answer this message.',
     sendButton: 'Send',
     title: 'Chat',
   },
@@ -69,11 +69,14 @@ export const en = {
   explanation: {
     ariaClose: 'Close explanation',
     cutOffNotice: 'The explanation was cut off because it got too long.',
-    declinedNotice: 'Claude declined to explain this passage.',
+    declinedNotice: 'The AI declined to explain this passage.',
     pendingStatus: 'Explaining…',
     title: 'Explanation',
   },
   settings: {
+    aiProviderHint:
+      'The AI service that answers the Chat page and explains selected text. Each one needs its API key set on the server.',
+    aiProviderLabel: 'AI provider',
     backTooltip: 'Back',
     clientVersion: 'Polka client v$version',
     connectionSuccessful: 'Connection successful',
@@ -83,7 +86,7 @@ export const en = {
     disconnectNasButton: 'Disconnect NAS',
     explanationLabel: 'Explanation language',
     explanationLanguageHint:
-      'Claude explains the text you select in the reader in this language, whatever language the book is in.',
+      'The AI explains the text you select in the reader in this language, whatever language the book is in.',
     forceRestartButton: 'Force Restart',
     forceRestartHint: 'Reloads the app right away. Useful if it feels stuck after an update.',
     githubLinkLabel: 'GitHub',

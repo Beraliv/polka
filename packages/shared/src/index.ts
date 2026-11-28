@@ -86,8 +86,25 @@ export type ChatMessage = {
   content: ChatContentBlock[];
 };
 
+// The AI service that answers chat messages and explanations. Each one needs
+// its own API key configured on the server.
+export const AI_PROVIDERS = [
+  { code: 'claude', name: 'Claude' },
+  { code: 'gemini', name: 'Gemini' },
+] as const;
+
+export type AiProviderCode = (typeof AI_PROVIDERS)[number]['code'];
+
+export const DEFAULT_AI_PROVIDER: AiProviderCode = 'claude';
+
+export function isAiProviderCode(code: unknown): code is AiProviderCode {
+  return AI_PROVIDERS.some((provider) => provider.code === code);
+}
+
 export type ChatRequest = {
   messages: ChatMessage[];
+  // Optional so a client that predates the setting keeps getting Claude.
+  provider?: AiProviderCode;
 };
 
 export type ChatStopReason =
@@ -148,6 +165,8 @@ export type ExplainRequest = {
   bookName: string;
   author?: string;
   language: ExplanationLanguageCode;
+  // Optional for the same reason as ChatRequest.provider.
+  provider?: AiProviderCode;
 };
 
 // `POST /api/explain` replies with the same Server-Sent Events as

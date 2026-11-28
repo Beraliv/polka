@@ -8,7 +8,7 @@ export interface ExplainPassageOptions {
   signal?: AbortSignal;
 }
 
-// Streams Claude's explanation of a passage, in the same events as a chat
+// Streams the AI's explanation of a passage, in the same events as a chat
 // reply.
 export async function explainPassage({
   request,

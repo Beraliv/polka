@@ -5,6 +5,7 @@ import { ChevronLeftIcon } from './ChevronLeftIcon.tsx';
 import { ChatMessageContent } from './ChatMessageContent.tsx';
 import { sendChatMessage } from '../lib/api';
 import { applyChatStreamEvent } from '../lib/chat/applyChatStreamEvent.ts';
+import { store } from '../store/books.ts';
 import { i18n } from '../i18n';
 
 export function ChatPage() {
@@ -62,7 +63,11 @@ export function ChatPage() {
     setMessages([...history, { role: 'assistant', content: [] }]);
     setSending(true);
     try {
-      await sendChatMessage({ messages: history, onEvent: handleStreamEvent });
+      await sendChatMessage({
+        messages: history,
+        provider: store.aiProvider,
+        onEvent: handleStreamEvent,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setMessages(history);

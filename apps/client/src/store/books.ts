@@ -1,7 +1,10 @@
 import { createStore } from 'solid-js/store';
 import {
+  DEFAULT_AI_PROVIDER,
   DEFAULT_EXPLANATION_LANGUAGE,
+  isAiProviderCode,
   isExplanationLanguageCode,
+  type AiProviderCode,
   type Book,
   type ExplanationLanguageCode,
   type SMBConfig,
@@ -18,6 +21,7 @@ import {
 const BOOKS_KEY = 'polka:books';
 const SERVER_URL_KEY = 'polka:server-url';
 const EXPLANATION_LANGUAGE_KEY = 'polka:explanation-language';
+const AI_PROVIDER_KEY = 'polka:ai-provider';
 /**
  * @deprecated Older versions of the client stored the NAS password in localStorage
  * under this key. It is no longer used. See https://github.com/Beraliv/polka/issues/7
@@ -43,6 +47,13 @@ function loadExplanationLanguage(): ExplanationLanguageCode {
   return isExplanationLanguageCode(stored) ? stored : DEFAULT_EXPLANATION_LANGUAGE;
 }
 
+// Same fallback as the explanation language: an unknown stored provider
+// (saved by a newer client) falls back to the default.
+function loadAiProvider(): AiProviderCode {
+  const stored = load<unknown>(AI_PROVIDER_KEY, DEFAULT_AI_PROVIDER);
+  return isAiProviderCode(stored) ? stored : DEFAULT_AI_PROVIDER;
+}
+
 try {
   localStorage.removeItem(LEGACY_SMB_KEY);
 } catch {
@@ -56,6 +67,7 @@ const [store, setStore] = createStore({
   smbStatus: null as SMBConfigSummary | null,
   serverUrl: load<string>(SERVER_URL_KEY, ''),
   explanationLanguage: loadExplanationLanguage(),
+  aiProvider: loadAiProvider(),
   sections: {} as Record<string, SectionItem[]>,
   toc: {} as Record<string, TocEntry[]>,
   notes: {} as Record<string, Record<string, Note>>,
@@ -185,6 +197,15 @@ export class BookStore {
       );
     }
     setStore('explanationLanguage', language);
+  }
+
+  static saveAiProvider(provider: AiProviderCode): void {
+    try {
+      localStorage.setItem(AI_PROVIDER_KEY, JSON.stringify(provider));
+    } catch (error) {
+      console.error('[saveAiProvider] Failed to save AI provider to local storage:', error);
+    }
+    setStore('aiProvider', provider);
   }
 
   static async loadSMBStatus(): Promise<void> {

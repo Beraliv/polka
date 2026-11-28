@@ -38,7 +38,7 @@ The client sends the passage, title, author, a language code and the AI provider
 
 ### Provider
 
-Settings → AI provider picks Claude (the default) or Gemini; the choice is kept per device and sent with each request. Both providers stream the same `ChatStreamEvent`s, so the client never branches on the provider. The Gemini route (`GEMINI_MODEL`, in `gemini-reply.ts`) runs the strongest Gemini model with the same 4,000-token cap, skips thought parts the way Claude's thinking blocks are skipped, and maps Gemini's safety finish reasons to `refusal`. Gemini has no blind comparison behind its model choice yet, so it is a judgement call, not a measured one.
+Settings → AI provider picks Claude (the default) or Gemini; the choice is kept per device and sent with each request. Which providers are offered, and when the choice is hidden, is in [Chat](chat.md). Both providers stream the same `ChatStreamEvent`s, so the client never branches on the provider. The Gemini route (`GEMINI_MODEL`, in `gemini-reply.ts`) runs the strongest Gemini model with the same 4,000-token cap, skips thought parts the way Claude's thinking blocks are skipped, and maps Gemini's safety finish reasons to `refusal`. Gemini has no blind comparison behind its model choice yet, so it is a judgement call, not a measured one.
 
 ### Model and refusals
 
